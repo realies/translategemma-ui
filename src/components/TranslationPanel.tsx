@@ -38,6 +38,18 @@ export function TranslationPanel() {
 
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sourcePanelRef = useRef<HTMLDivElement>(null);
+  const targetPanelRef = useRef<HTMLDivElement>(null);
+  const languageRowRef = useRef<HTMLDivElement>(null);
+
+  const [isWideView, setIsWideView] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const update = () => setIsWideView(mql.matches);
+    update();
+    mql.addEventListener("change", update);
+    return () => mql.removeEventListener("change", update);
+  }, []);
 
   // Track request ID to ignore stale responses
   const requestIdRef = useRef(0);
@@ -189,7 +201,7 @@ export function TranslationPanel() {
   return (
     <div className="mx-auto w-full max-w-5xl">
       {/* Language selectors */}
-      <div className="mb-4 flex items-center gap-2">
+      <div ref={languageRowRef} className="mb-4 flex items-center gap-2">
         <div className="min-w-0 flex-1">
           <LanguageSelector
             value={sourceLanguage}
@@ -200,6 +212,7 @@ export function TranslationPanel() {
             excludeCode={targetLanguage}
             storageKey="srcRecents"
             defaultRecents={sourceDefaultRecents}
+            dropdownAnchorRef={isWideView ? sourcePanelRef : languageRowRef}
           />
         </div>
 
@@ -229,6 +242,7 @@ export function TranslationPanel() {
             excludeCode={sourceLanguage}
             storageKey="tgtRecents"
             defaultRecents={targetDefaultRecents}
+            dropdownAnchorRef={isWideView ? targetPanelRef : languageRowRef}
           />
         </div>
       </div>
@@ -236,7 +250,10 @@ export function TranslationPanel() {
       {/* Text areas */}
       <div className="grid gap-4 md:grid-cols-2">
         {/* Source text */}
-        <div className="flex flex-col rounded-lg border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
+        <div
+          ref={sourcePanelRef}
+          className="flex flex-col rounded-lg border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800"
+        >
           <textarea
             ref={textareaRef}
             value={sourceText}
@@ -267,7 +284,10 @@ export function TranslationPanel() {
         </div>
 
         {/* Translated text */}
-        <div className="flex flex-col rounded-lg border border-zinc-100 bg-zinc-50 shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
+        <div
+          ref={targetPanelRef}
+          className="flex flex-col rounded-lg border border-zinc-100 bg-zinc-50 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+        >
           <div
             className={`min-h-48 flex-1 p-4 text-lg whitespace-pre-wrap ${
               isLoading ? "streaming-cursor" : ""

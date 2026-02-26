@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import type { RefObject } from "react";
 import { languages, getLanguageName, VALID_LANGUAGE_CODES } from "~/lib/languages";
 
 const MAX_RECENTS = 4;
@@ -9,6 +10,8 @@ interface LanguageSelectorProps {
   excludeCode?: string;
   storageKey: string;
   defaultRecents: string[];
+  /** When set, dropdown is positioned/sized to match this element (e.g. textarea panel below). */
+  dropdownAnchorRef?: RefObject<HTMLElement | null>;
 }
 
 function loadRecents(storageKey: string, defaults: string[]): string[] {
@@ -54,6 +57,7 @@ export function LanguageSelector({
   excludeCode,
   storageKey,
   defaultRecents,
+  dropdownAnchorRef,
 }: LanguageSelectorProps) {
   const [recents, setRecents] = useState<string[]>(() =>
     loadRecents(storageKey, defaultRecents)
@@ -61,7 +65,26 @@ export function LanguageSelector({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
+
+  const useAnchor = Boolean(isOpen && dropdownAnchorRef?.current);
+
+  useLayoutEffect(() => {
+    if (!useAnchor || !dropdownAnchorRef?.current) {
+      setAnchorRect(null);
+      return;
+    }
+    const el = dropdownAnchorRef.current;
+    const measure = () => setAnchorRect(el.getBoundingClientRect());
+    measure();
+    window.addEventListener("scroll", measure, true);
+    window.addEventListener("resize", measure);
+    return () => {
+      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("resize", measure);
+    };
+  }, [useAnchor, dropdownAnchorRef]);
 
   const visibleTabs = useMemo(
     () => recents.filter((c) => c !== excludeCode).slice(0, MAX_RECENTS),
@@ -150,6 +173,29 @@ export function LanguageSelector({
 
   const selectedName = value ? getLanguageName(value) : "Select language";
 
+  // When anchor is short (e.g. language row on mobile), position below it and overlay with viewport-based height; use anchor left/width so dropdown matches container margins
+  const dropdownStyle =
+    anchorRect &&
+    (typeof window !== "undefined" && anchorRect.height < 100
+      ? (() => {
+          const remaining = window.innerHeight - anchorRect.bottom - 16;
+          const maxHeight = Math.min(560, window.innerHeight * 0.7);
+          return {
+            position: "fixed" as const,
+            top: anchorRect.bottom + 8,
+            left: anchorRect.left,
+            width: anchorRect.width,
+            height: Math.min(remaining, maxHeight),
+          };
+        })()
+      : {
+          position: "fixed" as const,
+          top: anchorRect.top,
+          left: anchorRect.left,
+          width: anchorRect.width,
+          height: anchorRect.height,
+        });
+
   return (
     <div className="relative w-full min-w-0">
       <div className="flex min-w-0 items-center gap-1">
@@ -159,14 +205,21 @@ export function LanguageSelector({
           onClick={() => {
             setIsOpen(true);
           }}
-          className="flex-1 truncate rounded-full bg-zinc-200 px-3 py-1.5 text-left text-sm font-medium text-zinc-800 md:hidden dark:bg-zinc-700 dark:text-zinc-100"
+          className={`flex-1 truncate rounded-full px-3 py-1.5 text-left text-sm font-medium md:hidden transition-colors ${
+            isOpen
+              ? "bg-zinc-300 text-zinc-800 ring-1 ring-zinc-500 dark:bg-zinc-600 dark:text-zinc-100 dark:ring-zinc-400"
+              : "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
+          }`}
           aria-label="Select language"
+          aria-expanded={isOpen}
         >
           {selectedName}
         </button>
 
-        {/* Wide: recent language pills — flex-1 pushes search icon to the right */}
-        <div className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden md:flex">
+        {/* Wide: recent language pills — flex-1 pushes search icon to the right; mask fades edges when clipped */}
+        <div
+          className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden md:flex [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)]"
+        >
           {visibleTabs.map((code) => {
             const isActive = code === value;
             return (
@@ -208,7 +261,7 @@ export function LanguageSelector({
         </button>
       </div>
 
-      {/* Dropdown — full width of column, aligned below */}
+      {/* Dropdown — when anchor provided, match its position/size (textarea panel); else absolute below trigger */}
       {isOpen && (
         <>
           <div
@@ -218,8 +271,15 @@ export function LanguageSelector({
               close();
             }}
           />
-          <div className="absolute top-full left-0 z-20 mt-2 w-full min-w-64 rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800">
-            <div className="p-2">
+          <div
+            className={
+              anchorRect
+                ? "z-20 flex flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
+                : "absolute top-full left-0 z-20 mt-2 w-full min-w-64 flex flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
+            }
+            style={dropdownStyle ?? undefined}
+          >
+            <div className="shrink-0 p-2">
               <input
                 type="text"
                 placeholder="Search languages..."
@@ -233,7 +293,11 @@ export function LanguageSelector({
                 autoFocus
               />
             </div>
-            <ul ref={listRef} className="max-h-60 overflow-auto py-1" role="listbox">
+            <ul
+              ref={listRef}
+              className={`overflow-auto py-1 pr-2 [scrollbar-gutter:stable] ${anchorRect ? "min-h-0 flex-1" : "max-h-60"}`}
+              role="listbox"
+            >
               {filteredLanguages.map((lang, index) => (
                 <li key={lang.code} role="option" aria-selected={lang.code === value}>
                   <button
