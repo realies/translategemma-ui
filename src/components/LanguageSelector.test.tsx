@@ -32,8 +32,7 @@ describe("LanguageSelector", () => {
     await user.click(screen.getByRole("button", { name: "Search languages" }));
     expect(screen.getByRole("listbox")).toBeInTheDocument();
 
-    const overlay = document.querySelector(".fixed.inset-0");
-    if (!overlay) throw new Error("Expected overlay element");
+    const overlay = screen.getByTestId("language-selector-overlay");
     await user.click(overlay);
 
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();

@@ -9,10 +9,9 @@ const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"];
 export function TranslationPanel() {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
-  const [sourceLanguage, setSourceLanguage] = useState(
-    () => localStorage.getItem("srcLang") ?? "en"
-  );
-  const [targetLanguage, setTargetLanguage] = useState(() => localStorage.getItem("tgtLang") ?? "");
+  // Initialized with safe SSR defaults; localStorage values applied on mount via useEffect
+  const [sourceLanguage, setSourceLanguage] = useState("en");
+  const [targetLanguage, setTargetLanguage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{
@@ -26,6 +25,14 @@ export function TranslationPanel() {
   // Track request ID to ignore stale responses
   const requestIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Restore language preferences from localStorage on mount (client-only)
+  useEffect(() => {
+    const src = localStorage.getItem("srcLang");
+    const tgt = localStorage.getItem("tgtLang");
+    if (src) setSourceLanguage(src);
+    if (tgt) setTargetLanguage(tgt);
+  }, []);
 
   const cancelPendingRequest = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -114,7 +121,9 @@ export function TranslationPanel() {
     };
   }, [handleTranslate]);
 
-  // Debounced auto-translate on text change (500ms)
+  // Debounced auto-translate on text change (500ms).
+  // handleTranslate is intentionally omitted — it changes on every sourceText
+  // update, which would reset the debounce timer on each keystroke.
   useEffect(() => {
     if (!sourceText.trim() || !targetLanguage) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -126,7 +135,9 @@ export function TranslationPanel() {
     };
   }, [sourceText]);
 
-  // Immediate auto-translate on language change (if text exists)
+  // Immediate auto-translate on language change (if text exists).
+  // handleTranslate and sourceText are intentionally omitted — including them
+  // would duplicate the debounced effect above on every keystroke.
   useEffect(() => {
     if (!sourceText.trim() || !targetLanguage) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -138,7 +149,7 @@ export function TranslationPanel() {
     const el = textareaRef.current;
     if (el) {
       el.style.height = "0";
-      el.style.height = `${String(Math.max(192, el.scrollHeight))}px`;
+      el.style.height = `${Math.max(192, el.scrollHeight).toString()}px`;
     }
   }, [sourceText]);
 
@@ -170,7 +181,6 @@ export function TranslationPanel() {
             excludeCode={targetLanguage}
             storageKey="srcRecents"
             defaultRecents={DEFAULT_SOURCE_RECENTS}
-            align="left"
           />
         </div>
 
@@ -200,7 +210,6 @@ export function TranslationPanel() {
             excludeCode={sourceLanguage}
             storageKey="tgtRecents"
             defaultRecents={DEFAULT_TARGET_RECENTS}
-            align="right"
           />
         </div>
       </div>

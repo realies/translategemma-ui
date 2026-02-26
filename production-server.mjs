@@ -35,6 +35,9 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 30;
 const rateLimitMap = new Map();
 
+// NOTE: X-Forwarded-For is trusted here. Only deploy behind a trusted reverse
+// proxy (e.g. nginx) that sets this header — never expose directly to the internet,
+// as clients could spoof the header and bypass rate limiting.
 function getClientIp(req) {
   const forwarded = req.headers["x-forwarded-for"];
   if (forwarded) return forwarded.split(",")[0].trim();
@@ -63,7 +66,8 @@ setInterval(() => {
 }, RATE_LIMIT_WINDOW_MS).unref();
 
 // --- Host header validation ---
-const VALID_HOST_RE = /^[a-zA-Z0-9._\-[\]:]+(?::\d+)?$/;
+// Allows: regular hostnames (no bare colons), bracketed IPv6, optional :port
+const VALID_HOST_RE = /^(?:\[[^\]]+\]|[a-zA-Z0-9._-]+)(?::\d+)?$/;
 
 const clientDir = resolve(__dirname, "dist", "client");
 const clientDirWithSep = clientDir + sep;
@@ -117,9 +121,14 @@ const httpServer = createServer(async (req, res) => {
         const content = await readFile(filePath);
         const ext = extname(filePath);
         const contentType = MIME_TYPES[ext] || "application/octet-stream";
+        // Assets under /assets/ are content-hashed by Vite — safe to cache forever.
+        // Other static files (e.g. /favicon.svg) are not hashed, use a shorter TTL.
+        const cacheControl = url.pathname.startsWith("/assets/")
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=86400";
         res.writeHead(200, {
           "Content-Type": contentType,
-          "Cache-Control": "public, max-age=31536000, immutable",
+          "Cache-Control": cacheControl,
         });
         res.end(content);
         return;

@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { languages, getLanguageName } from "~/lib/languages";
 
@@ -10,7 +9,6 @@ interface LanguageSelectorProps {
   excludeCode?: string;
   storageKey: string;
   defaultRecents: string[];
-  align?: "left" | "right";
 }
 
 function loadRecents(storageKey: string, defaults: string[]): string[] {
@@ -97,7 +95,7 @@ export function LanguageSelector({
       saveRecents(storageKey, next);
       return next;
     });
-  }, [value]);
+  }, [value, storageKey]);
 
   // Move cursor to first result whenever search changes
   useEffect(() => {
@@ -203,6 +201,7 @@ export function LanguageSelector({
       {isOpen && (
         <>
           <div
+            data-testid="language-selector-overlay"
             className="fixed inset-0 z-10"
             onClick={() => {
               close();
