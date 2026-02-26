@@ -35,12 +35,16 @@ const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 30;
 const rateLimitMap = new Map();
 
-// NOTE: X-Forwarded-For is trusted here. Only deploy behind a trusted reverse
-// proxy (e.g. nginx) that sets this header — never expose directly to the internet,
+// Set TRUST_PROXY=true only when deployed behind a trusted reverse proxy
+// (e.g. nginx) that sets X-Forwarded-For — never expose directly to the internet,
 // as clients could spoof the header and bypass rate limiting.
+const trustProxy = process.env.TRUST_PROXY === "true";
+
 function getClientIp(req) {
-  const forwarded = req.headers["x-forwarded-for"];
-  if (forwarded) return forwarded.split(",")[0].trim();
+  if (trustProxy) {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (forwarded) return forwarded.split(",")[0].trim();
+  }
   return req.socket.remoteAddress;
 }
 
@@ -94,7 +98,14 @@ const httpServer = createServer(async (req, res) => {
       return;
     }
 
-    const url = new URL(req.url || "/", `http://${hostHeader}`);
+    let url;
+    try {
+      url = new URL(req.url || "/", `http://${hostHeader}`);
+    } catch {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Bad Request");
+      return;
+    }
 
     // Rate limit POST requests (server functions / API calls)
     if (req.method === "POST") {

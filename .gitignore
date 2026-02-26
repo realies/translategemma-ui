@@ -25,5 +25,3 @@ Thumbs.db
 *.log
 npm-debug.log*
 
-# Generated files
-src/routeTree.gen.ts

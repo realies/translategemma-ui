@@ -6,6 +6,14 @@ import { translate } from "~/serverFunctions/translate";
 const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"];
 const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"];
 
+function setLocalStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // localStorage unavailable (e.g. private browsing with strict settings)
+  }
+}
+
 export function TranslationPanel() {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
@@ -28,10 +36,14 @@ export function TranslationPanel() {
 
   // Restore language preferences from localStorage on mount (client-only)
   useEffect(() => {
-    const src = localStorage.getItem("srcLang");
-    const tgt = localStorage.getItem("tgtLang");
-    if (src) setSourceLanguage(src);
-    if (tgt) setTargetLanguage(tgt);
+    try {
+      const src = localStorage.getItem("srcLang");
+      const tgt = localStorage.getItem("tgtLang");
+      if (src) setSourceLanguage(src);
+      if (tgt) setTargetLanguage(tgt);
+    } catch {
+      // localStorage unavailable (e.g. private browsing with strict settings)
+    }
   }, []);
 
   const cancelPendingRequest = useCallback(() => {
@@ -91,8 +103,8 @@ export function TranslationPanel() {
     cancelPendingRequest();
     setSourceLanguage(targetLanguage);
     setTargetLanguage(sourceLanguage);
-    localStorage.setItem("srcLang", targetLanguage);
-    localStorage.setItem("tgtLang", sourceLanguage);
+    setLocalStorage("srcLang", targetLanguage);
+    setLocalStorage("tgtLang", sourceLanguage);
     setSourceText(translatedText);
     setTranslatedText(sourceText);
     setError(null);
@@ -176,7 +188,7 @@ export function TranslationPanel() {
             value={sourceLanguage}
             onChange={(code) => {
               setSourceLanguage(code);
-              localStorage.setItem("srcLang", code);
+              setLocalStorage("srcLang", code);
             }}
             excludeCode={targetLanguage}
             storageKey="srcRecents"
@@ -205,7 +217,7 @@ export function TranslationPanel() {
             value={targetLanguage}
             onChange={(code) => {
               setTargetLanguage(code);
-              localStorage.setItem("tgtLang", code);
+              setLocalStorage("tgtLang", code);
             }}
             excludeCode={sourceLanguage}
             storageKey="tgtRecents"
