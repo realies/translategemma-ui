@@ -6,7 +6,18 @@
 
 Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technology/developers-tools/translategemma/), Google's open translation model.
 
-Supports 55 languages with a clean, minimal UI.
+![TranslateGemma UI](https://github.com/user-attachments/assets/8c58730a-5fe2-4e0c-a327-08db3ba49346)
+
+## Features
+
+- **55 languages** — searchable dropdowns with native names
+- **Local inference** — no data leaves your machine, powered by [Ollama](https://ollama.ai)
+- **Keyboard-first** — `⌘ Enter` / `Ctrl Enter` triggers translation from anywhere on the page; arrow keys navigate language dropdowns
+- **Remembers preferences** — last used language pair is restored on reload
+- **Swap languages** — flip source and target with one click
+- **Translation stats** — shows duration and token count after each translation
+- **Light & dark mode** — follows your system preference
+- **Multi-arch Docker** — native images for `linux/amd64` and `linux/arm64`
 
 ## Quick Start
 
@@ -28,10 +39,13 @@ Access the UI at `http://localhost:3000`
 
 ## Requirements
 
-- [Ollama](https://ollama.ai) running with TranslateGemma model:
-  ```bash
-  ollama pull translategemma:27b
-  ```
+[Ollama](https://ollama.ai) running with a TranslateGemma model:
+
+```bash
+ollama pull translategemma:27b   # best quality (~16GB)
+ollama pull translategemma:12b   # balanced (~7GB)
+ollama pull translategemma:4b    # fastest (~2.5GB)
+```
 
 ## Configuration
 
@@ -48,6 +62,6 @@ Arabic, Bengali, Bulgarian, Catalan, Chinese (Simplified/Traditional), Croatian,
 
 ## Tech Stack
 
-- [TanStack Start](https://tanstack.com/start) - React framework
-- [Tailwind CSS](https://tailwindcss.com) - Styling
-- [TypeScript](https://www.typescriptlang.org) - Type safety
+- [TanStack Start](https://tanstack.com/start) — React 19 full-stack framework
+- [Tailwind CSS](https://tailwindcss.com) — styling
+- [TypeScript](https://www.typescriptlang.org) — type safety

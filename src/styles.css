@@ -26,12 +26,6 @@ body {
   @apply bg-zinc-400 dark:bg-zinc-500;
 }
 
-/* Textarea and input focus */
-textarea:focus,
-select:focus {
-  @apply ring-2 ring-blue-500 ring-offset-2 ring-offset-white outline-none dark:ring-offset-zinc-900;
-}
-
 /* Streaming animation */
 @keyframes pulse-opacity {
   0%,
