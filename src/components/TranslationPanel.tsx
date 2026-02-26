@@ -1,7 +1,9 @@
-/* eslint-disable react-hooks/exhaustive-deps */
 import { useState, useCallback, useRef, useEffect } from "react";
 import { LanguageSelector } from "./LanguageSelector";
 import { translate } from "~/serverFunctions/translate";
+import { languages } from "~/lib/languages";
+
+const VALID_LANGUAGE_CODES = new Set(languages.map((l) => l.code));
 
 const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"];
 const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"];
@@ -39,8 +41,8 @@ export function TranslationPanel() {
     try {
       const src = localStorage.getItem("srcLang");
       const tgt = localStorage.getItem("tgtLang");
-      if (src) setSourceLanguage(src);
-      if (tgt) setTargetLanguage(tgt);
+      if (src && VALID_LANGUAGE_CODES.has(src)) setSourceLanguage(src);
+      if (tgt && VALID_LANGUAGE_CODES.has(tgt)) setTargetLanguage(tgt);
     } catch {
       // localStorage unavailable (e.g. private browsing with strict settings)
     }
@@ -101,6 +103,7 @@ export function TranslationPanel() {
   }, [sourceText, sourceLanguage, targetLanguage]);
 
   const handleSwapLanguages = useCallback(() => {
+    if (!targetLanguage) return;
     cancelPendingRequest();
     setSourceLanguage(targetLanguage);
     setTargetLanguage(sourceLanguage);
