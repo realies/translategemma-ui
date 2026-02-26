@@ -22,9 +22,14 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){var m=window.matchMedia('(prefers-color-scheme: dark)');function u(){document.documentElement.classList.toggle('dark',m.matches)}u();m.addEventListener('change',u)})()`,
+          }}
+        />
       </head>
       <body>
         <Outlet />
