@@ -1,9 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { LanguageSelector } from "./LanguageSelector";
 import { translate } from "~/serverFunctions/translate";
-import { languages } from "~/lib/languages";
-
-const VALID_LANGUAGE_CODES = new Set(languages.map((l) => l.code));
+import { VALID_LANGUAGE_CODES } from "~/lib/languages";
 
 const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"];
 const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"];
@@ -35,6 +33,7 @@ export function TranslationPanel() {
   // Track request ID to ignore stale responses
   const requestIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Restore language preferences from localStorage on mount (client-only)
   useEffect(() => {
@@ -174,7 +173,8 @@ export function TranslationPanel() {
       try {
         await navigator.clipboard.writeText(translatedText);
         setCopied(true);
-        setTimeout(() => {
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => {
           setCopied(false);
         }, 2000);
       } catch {
@@ -182,6 +182,12 @@ export function TranslationPanel() {
       }
     }
   }, [translatedText]);
+
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
 
   return (
     <div className="mx-auto w-full max-w-5xl">

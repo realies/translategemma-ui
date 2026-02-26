@@ -1,8 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
-import { languages, getLanguageName } from "~/lib/languages";
+import { languages, getLanguageName, VALID_LANGUAGE_CODES } from "~/lib/languages";
 
 const MAX_RECENTS = 4;
-const VALID_LANGUAGE_CODES = new Set(languages.map((l) => l.code));
 
 interface LanguageSelectorProps {
   value: string;

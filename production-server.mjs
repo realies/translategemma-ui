@@ -50,7 +50,7 @@ function getClientIp(req) {
       if (last) return last;
     }
   }
-  return req.socket.remoteAddress;
+  return req.socket.remoteAddress ?? "unknown";
 }
 
 function isRateLimited(ip) {
