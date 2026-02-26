@@ -23,19 +23,111 @@ const MIME_TYPES = {
   ".woff2": "font/woff2",
 };
 
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+};
+
+// --- In-memory rate limiter for POST requests (API / server functions) ---
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const RATE_LIMIT_MAX = 30;
+const rateLimitMap = new Map();
+
+// Set TRUST_PROXY=true only when deployed behind a trusted reverse proxy
+// (e.g. nginx) that sets X-Forwarded-For — never expose directly to the internet,
+// as clients could spoof the header and bypass rate limiting.
+const trustProxy = process.env.TRUST_PROXY === "true";
+
+function getClientIp(req) {
+  if (trustProxy) {
+    const forwarded = req.headers["x-forwarded-for"];
+    if (forwarded) {
+      // Use the rightmost entry — appended by our trusted proxy, not spoofable by the client.
+      const parts = forwarded.split(",");
+      const last = parts[parts.length - 1].trim();
+      if (last) return last;
+    }
+  }
+  return req.socket.remoteAddress ?? "unknown";
+}
+
+function isRateLimited(ip) {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(ip, { windowStart: now, count: 1 });
+    return false;
+  }
+  entry.count++;
+  return entry.count > RATE_LIMIT_MAX;
+}
+
+// Periodically clean up stale entries to prevent memory growth
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of rateLimitMap) {
+    if (now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+      rateLimitMap.delete(ip);
+    }
+  }
+}, RATE_LIMIT_WINDOW_MS).unref();
+
+// --- Host header validation ---
+// Allows: regular hostnames (no bare colons), bracketed IPv6, optional :port
+const VALID_HOST_RE = /^(?:\[[^\]]+\]|[a-zA-Z0-9._-]+)(?::\d+)?$/;
+
 const clientDir = resolve(__dirname, "dist", "client");
 const clientDirWithSep = clientDir + sep;
 
 const httpServer = createServer(async (req, res) => {
+  // Apply security headers to every response
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    res.setHeader(key, value);
+  }
+
   try {
-    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+    // Health check endpoint (before host validation for load-balancer probes)
+    if (req.url === "/health" || req.url === "/health/") {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("OK");
+      return;
+    }
+
+    // Validate Host header to prevent host-header injection
+    const hostHeader = req.headers.host || `localhost:${port}`;
+    if (!VALID_HOST_RE.test(hostHeader)) {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Bad Request");
+      return;
+    }
+
+    let url;
+    try {
+      url = new URL(req.url || "/", `http://${hostHeader}`);
+    } catch {
+      res.writeHead(400, { "Content-Type": "text/plain" });
+      res.end("Bad Request");
+      return;
+    }
+
+    // Rate limit POST requests (server functions / API calls)
+    if (req.method === "POST") {
+      const ip = getClientIp(req);
+      if (isRateLimited(ip)) {
+        res.writeHead(429, { "Content-Type": "text/plain" });
+        res.end("Too Many Requests");
+        return;
+      }
+    }
 
     // Serve static assets from dist/client
-    if (url.pathname.startsWith("/assets/")) {
+    if (url.pathname.startsWith("/assets/") || url.pathname === "/favicon.svg") {
       const filePath = normalize(join(clientDir, url.pathname));
 
       // Prevent path traversal
-      if (!filePath.startsWith(clientDirWithSep) && filePath !== clientDir) {
+      if (!filePath.startsWith(clientDirWithSep)) {
         res.writeHead(403, { "Content-Type": "text/plain" });
         res.end("Forbidden");
         return;
@@ -45,14 +137,19 @@ const httpServer = createServer(async (req, res) => {
         const content = await readFile(filePath);
         const ext = extname(filePath);
         const contentType = MIME_TYPES[ext] || "application/octet-stream";
+        // Assets under /assets/ are content-hashed by Vite — safe to cache forever.
+        // Other static files (e.g. /favicon.svg) are not hashed, use a shorter TTL.
+        const cacheControl = url.pathname.startsWith("/assets/")
+          ? "public, max-age=31536000, immutable"
+          : "public, max-age=86400";
         res.writeHead(200, {
           "Content-Type": contentType,
-          "Cache-Control": "public, max-age=31536000, immutable",
+          "Cache-Control": cacheControl,
         });
         res.end(content);
         return;
       } catch (err) {
-        if (err.code === "ENOENT") {
+        if (err.code === "ENOENT" || err.code === "EISDIR") {
           res.writeHead(404, { "Content-Type": "text/plain" });
           res.end("Not Found");
         } else {

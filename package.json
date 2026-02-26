@@ -11,7 +11,10 @@
     "lint:check": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
+    "generate": "tsr generate",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
     "prepare": "husky"
   },
@@ -27,22 +30,28 @@
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@tailwindcss/vite": "4.1.18",
+    "@tanstack/router-cli": "^1.157.16",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "22.15.3",
     "@types/react": "19.2.10",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.2",
     "eslint-config-prettier": "10.1.1",
     "eslint-plugin-react": "7.37.4",
-    "eslint-plugin-react-hooks": "5.2.0",
+    "eslint-plugin-react-hooks": "^6.1.1",
     "globals": "16.2.0",
     "husky": "^9.1.7",
+    "jsdom": "^28.1.0",
     "lint-staged": "^16.2.7",
     "prettier": "3.8.1",
     "prettier-plugin-tailwindcss": "0.7.2",
     "tailwindcss": "4.1.18",
     "typescript": "5.8.3",
     "typescript-eslint": "8.33.0",
-    "vite-tsconfig-paths": "5.1.4"
+    "vite-tsconfig-paths": "5.1.4",
+    "vitest": "^4.0.18"
   },
   "lint-staged": {
     "*.{ts,tsx}": [

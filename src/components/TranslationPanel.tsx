@@ -1,10 +1,23 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { LanguageSelector } from "./LanguageSelector";
 import { translate } from "~/serverFunctions/translate";
+import { VALID_LANGUAGE_CODES } from "~/lib/languages";
+
+const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"];
+const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"];
+
+function setLocalStorage(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // localStorage unavailable (e.g. private browsing with strict settings)
+  }
+}
 
 export function TranslationPanel() {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
+  // Initialized with safe SSR defaults; localStorage values applied on mount via useEffect
   const [sourceLanguage, setSourceLanguage] = useState("en");
   const [targetLanguage, setTargetLanguage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -14,18 +27,37 @@ export function TranslationPanel() {
     tokens?: number;
   } | null>(null);
 
+  const [copied, setCopied] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Track request ID to ignore stale responses
   const requestIdRef = useRef(0);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Restore language preferences from localStorage on mount (client-only)
+  useEffect(() => {
+    try {
+      const src = localStorage.getItem("srcLang");
+      const tgt = localStorage.getItem("tgtLang");
+      if (src && VALID_LANGUAGE_CODES.has(src)) setSourceLanguage(src);
+      if (tgt && VALID_LANGUAGE_CODES.has(tgt)) setTargetLanguage(tgt);
+    } catch {
+      // localStorage unavailable (e.g. private browsing with strict settings)
+    }
+  }, []);
 
   const cancelPendingRequest = useCallback(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     requestIdRef.current += 1;
     setIsLoading(false);
   }, []);
 
   const handleTranslate = useCallback(async () => {
-    if (!sourceText.trim()) return;
+    if (!sourceText.trim() || !targetLanguage) return;
 
-    // Cancel any pending request and start new one
+    // Cancel any pending debounce and start a new request
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     requestIdRef.current += 1;
     const currentRequestId = requestIdRef.current;
 
@@ -70,9 +102,12 @@ export function TranslationPanel() {
   }, [sourceText, sourceLanguage, targetLanguage]);
 
   const handleSwapLanguages = useCallback(() => {
+    if (!targetLanguage) return;
     cancelPendingRequest();
     setSourceLanguage(targetLanguage);
     setTargetLanguage(sourceLanguage);
+    setLocalStorage("srcLang", targetLanguage);
+    setLocalStorage("tgtLang", sourceLanguage);
     setSourceText(translatedText);
     setTranslatedText(sourceText);
     setError(null);
@@ -87,36 +122,97 @@ export function TranslationPanel() {
     setStats(null);
   }, [cancelPendingRequest]);
 
+  // Global Cmd/Ctrl+Enter shortcut to trigger translation
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        void handleTranslate();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => {
+      window.removeEventListener("keydown", handler);
+    };
+  }, [handleTranslate]);
+
+  // Debounced auto-translate on text change (500ms).
+  // handleTranslate is intentionally omitted — it changes on every sourceText
+  // update, which would reset the debounce timer on each keystroke.
+  useEffect(() => {
+    if (!sourceText.trim() || !targetLanguage) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      void handleTranslate();
+    }, 500);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [sourceText]);
+
+  // Immediate auto-translate on language change (if text exists).
+  // handleTranslate and sourceText are intentionally omitted — including them
+  // would duplicate the debounced effect above on every keystroke.
+  useEffect(() => {
+    if (!sourceText.trim() || !targetLanguage) return;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    void handleTranslate();
+  }, [sourceLanguage, targetLanguage]);
+
+  // Auto-resize textarea height based on content
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "0";
+      el.style.height = `${Math.max(192, el.scrollHeight).toString()}px`;
+    }
+  }, [sourceText]);
+
   const handleCopy = useCallback(async () => {
     if (translatedText) {
       try {
         await navigator.clipboard.writeText(translatedText);
+        setCopied(true);
+        if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        copyTimeoutRef.current = setTimeout(() => {
+          setCopied(false);
+        }, 2000);
       } catch {
         // Clipboard access may fail in insecure contexts
       }
     }
   }, [translatedText]);
 
+  useEffect(() => {
+    return () => {
+      if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+    };
+  }, []);
+
   return (
     <div className="mx-auto w-full max-w-5xl">
       {/* Language selectors */}
-      <div className="mb-6 flex items-end gap-4">
-        <div className="flex-1">
+      <div className="mb-4 flex items-center gap-2">
+        <div className="min-w-0 flex-1">
           <LanguageSelector
             value={sourceLanguage}
-            onChange={setSourceLanguage}
-            label="From"
+            onChange={(code) => {
+              setSourceLanguage(code);
+              setLocalStorage("srcLang", code);
+            }}
             excludeCode={targetLanguage}
+            storageKey="srcRecents"
+            defaultRecents={DEFAULT_SOURCE_RECENTS}
           />
         </div>
 
         <button
           type="button"
           onClick={handleSwapLanguages}
-          className="mb-0.5 rounded-lg border border-zinc-100 bg-white p-2.5 text-zinc-600 shadow-sm transition-colors hover:bg-zinc-50 hover:text-zinc-900 dark:border-zinc-800 dark:bg-zinc-800 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-100"
+          className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
           title="Swap languages"
         >
-          <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -126,12 +222,16 @@ export function TranslationPanel() {
           </svg>
         </button>
 
-        <div className="flex-1">
+        <div className="min-w-0 flex-1">
           <LanguageSelector
             value={targetLanguage}
-            onChange={setTargetLanguage}
-            label="To"
+            onChange={(code) => {
+              setTargetLanguage(code);
+              setLocalStorage("tgtLang", code);
+            }}
             excludeCode={sourceLanguage}
+            storageKey="tgtRecents"
+            defaultRecents={DEFAULT_TARGET_RECENTS}
           />
         </div>
       </div>
@@ -141,15 +241,13 @@ export function TranslationPanel() {
         {/* Source text */}
         <div className="flex flex-col rounded-lg border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800">
           <textarea
+            ref={textareaRef}
             value={sourceText}
             onChange={(e) => {
               setSourceText(e.target.value);
-              e.target.style.height = "auto";
-              e.target.style.height = `${String(Math.max(192, e.target.scrollHeight))}px`;
             }}
             placeholder="Enter text to translate..."
             className="min-h-48 w-full resize-none overflow-hidden bg-transparent p-4 text-lg focus:outline-none"
-            style={{ height: "192px" }}
           />
           <div className="flex h-10 items-center justify-end gap-2 border-t border-zinc-100 px-3 dark:border-zinc-800">
             <button
@@ -192,17 +290,28 @@ export function TranslationPanel() {
             <button
               type="button"
               onClick={handleCopy}
-              className={`rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300 ${!translatedText ? "invisible" : ""}`}
-              title="Copy to clipboard"
+              className={`rounded-md p-1 transition-colors ${copied ? "text-green-500" : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"} ${!translatedText ? "invisible" : ""}`}
+              title={copied ? "Copied!" : "Copy to clipboard"}
             >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
-                />
-              </svg>
+              {copied ? (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M5 13l4 4L19 7"
+                  />
+                </svg>
+              ) : (
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+                  />
+                </svg>
+              )}
             </button>
             {stats && (
               <span className="text-xs text-zinc-400">
@@ -211,49 +320,6 @@ export function TranslationPanel() {
             )}
           </div>
         </div>
-      </div>
-
-      {/* Translate button */}
-      <div className="mt-6 flex justify-center">
-        <button
-          type="button"
-          onClick={handleTranslate}
-          disabled={isLoading || !sourceText.trim() || !targetLanguage}
-          className="flex items-center gap-2 rounded-lg bg-blue-600 px-8 py-3 font-semibold text-white shadow-lg transition-all hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 dark:focus:ring-offset-zinc-900"
-        >
-          {isLoading ? (
-            <>
-              <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Translating...
-            </>
-          ) : (
-            <>
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"
-                />
-              </svg>
-              Translate
-            </>
-          )}
-        </button>
       </div>
     </div>
   );

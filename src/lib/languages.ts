@@ -70,3 +70,5 @@ export function getLanguageByCode(code: string): Language | undefined {
 export function getLanguageName(code: string): string {
   return getLanguageByCode(code)?.name ?? code;
 }
+
+export const VALID_LANGUAGE_CODES = new Set(languages.map((l) => l.code));
