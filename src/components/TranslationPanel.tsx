@@ -1,10 +1,15 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { LanguageSelector } from "./LanguageSelector";
 import { translate } from "~/serverFunctions/translate";
 import { VALID_LANGUAGE_CODES } from "~/lib/languages";
 
 const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"] as const;
 const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"] as const;
+
+const srcLang = localStorage.getItem("srcLang") ?? "";
+const src = VALID_LANGUAGE_CODES.has(srcLang) ? srcLang : DEFAULT_SOURCE_RECENTS[0];
+const tgtLang = localStorage.getItem("tgtLang") ?? "";
+const tgt = VALID_LANGUAGE_CODES.has(tgtLang) ? tgtLang : DEFAULT_TARGET_RECENTS[0];
 
 function setLocalStorage(key: string, value: string) {
   try {
@@ -17,9 +22,13 @@ function setLocalStorage(key: string, value: string) {
 export function TranslationPanel() {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
-  // Initialized with safe SSR defaults; localStorage values applied on mount via useEffect
-  const [sourceLanguage, setSourceLanguage] = useState("en");
-  const [targetLanguage, setTargetLanguage] = useState("");
+
+  // Stable array refs for defaultRecents so LanguageSelector's mount-only useEffect doesn't re-run every render.
+  const sourceDefaultRecents = useMemo(() => [...DEFAULT_SOURCE_RECENTS], []);
+  const targetDefaultRecents = useMemo(() => [...DEFAULT_TARGET_RECENTS], []);
+
+  const [sourceLanguage, setSourceLanguage] = useState<string>(src);
+  const [targetLanguage, setTargetLanguage] = useState<string>(tgt);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{
@@ -34,20 +43,6 @@ export function TranslationPanel() {
   const requestIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Restore language preferences from localStorage on mount (client-only).
-  // In incognito/strict private browsing localStorage may be empty or throw, so default target to first recent.
-  useEffect(() => {
-    try {
-      const src = localStorage.getItem("srcLang");
-      const tgt = localStorage.getItem("tgtLang");
-      if (src && VALID_LANGUAGE_CODES.has(src)) setSourceLanguage(src);
-      if (tgt && VALID_LANGUAGE_CODES.has(tgt)) setTargetLanguage(tgt);
-      else setTargetLanguage(DEFAULT_TARGET_RECENTS[0]);
-    } catch {
-      setTargetLanguage(DEFAULT_TARGET_RECENTS[0]);
-    }
-  }, []);
 
   const cancelPendingRequest = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -204,7 +199,7 @@ export function TranslationPanel() {
             }}
             excludeCode={targetLanguage}
             storageKey="srcRecents"
-            defaultRecents={[...DEFAULT_SOURCE_RECENTS]}
+            defaultRecents={sourceDefaultRecents}
           />
         </div>
 
@@ -233,7 +228,7 @@ export function TranslationPanel() {
             }}
             excludeCode={sourceLanguage}
             storageKey="tgtRecents"
-            defaultRecents={[...DEFAULT_TARGET_RECENTS]}
+            defaultRecents={targetDefaultRecents}
           />
         </div>
       </div>

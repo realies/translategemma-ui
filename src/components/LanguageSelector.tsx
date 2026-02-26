@@ -55,8 +55,9 @@ export function LanguageSelector({
   storageKey,
   defaultRecents,
 }: LanguageSelectorProps) {
-  // Initialized with safe SSR defaults; localStorage values applied on mount via useEffect
-  const [recents, setRecents] = useState<string[]>(defaultRecents);
+  const [recents, setRecents] = useState<string[]>(() =>
+    loadRecents(storageKey, defaultRecents)
+  );
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -96,13 +97,6 @@ export function LanguageSelector({
     },
     [recents, onChange, storageKey, close]
   );
-
-  // Restore recents from localStorage on mount (client-only).
-  // storageKey and defaultRecents are module-level constants — stable references.
-  useEffect(() => {
-    const stored = loadRecents(storageKey, defaultRecents);
-    setRecents(stored);
-  }, [storageKey, defaultRecents]);
 
   // Keep value in recents when it changes externally (e.g. swap)
   useEffect(() => {
