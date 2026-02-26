@@ -45,10 +45,14 @@ export function TranslationPanel() {
   const [isWideView, setIsWideView] = useState(false);
   useEffect(() => {
     const mql = window.matchMedia("(min-width: 768px)");
-    const update = () => setIsWideView(mql.matches);
+    const update = () => {
+      setIsWideView(mql.matches);
+    };
     update();
     mql.addEventListener("change", update);
-    return () => mql.removeEventListener("change", update);
+    return () => {
+      mql.removeEventListener("change", update);
+    };
   }, []);
 
   // Track request ID to ignore stale responses

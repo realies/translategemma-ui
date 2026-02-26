@@ -59,9 +59,7 @@ export function LanguageSelector({
   defaultRecents,
   dropdownAnchorRef,
 }: LanguageSelectorProps) {
-  const [recents, setRecents] = useState<string[]>(() =>
-    loadRecents(storageKey, defaultRecents)
-  );
+  const [recents, setRecents] = useState<string[]>(() => loadRecents(storageKey, defaultRecents));
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -76,7 +74,9 @@ export function LanguageSelector({
       return;
     }
     const el = dropdownAnchorRef.current;
-    const measure = () => setAnchorRect(el.getBoundingClientRect());
+    const measure = () => {
+      setAnchorRect(el.getBoundingClientRect());
+    };
     measure();
     window.addEventListener("scroll", measure, true);
     window.addEventListener("resize", measure);
@@ -205,7 +205,7 @@ export function LanguageSelector({
           onClick={() => {
             setIsOpen(true);
           }}
-          className={`flex-1 truncate rounded-full px-3 py-1.5 text-left text-sm font-medium md:hidden transition-colors ${
+          className={`flex-1 truncate rounded-full px-3 py-1.5 text-left text-sm font-medium transition-colors md:hidden ${
             isOpen
               ? "bg-zinc-300 text-zinc-800 ring-1 ring-zinc-500 dark:bg-zinc-600 dark:text-zinc-100 dark:ring-zinc-400"
               : "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
@@ -217,9 +217,7 @@ export function LanguageSelector({
         </button>
 
         {/* Wide: recent language pills — flex-1 pushes search icon to the right; mask fades edges when clipped */}
-        <div
-          className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden md:flex [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)]"
-        >
+        <div className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex">
           {visibleTabs.map((code) => {
             const isActive = code === value;
             return (
@@ -275,7 +273,7 @@ export function LanguageSelector({
             className={
               anchorRect
                 ? "z-20 flex flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
-                : "absolute top-full left-0 z-20 mt-2 w-full min-w-64 flex flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
+                : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
             }
             style={dropdownStyle ?? undefined}
           >

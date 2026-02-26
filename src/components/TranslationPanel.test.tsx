@@ -26,6 +26,15 @@ async function selectTargetLanguage(
 describe("TranslationPanel", () => {
   beforeEach(() => {
     mockTranslate.mockReset();
+    Object.defineProperty(window, "matchMedia", {
+      value: vi.fn().mockImplementation((query: string) => ({
+        matches: false,
+        media: query,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+      writable: true,
+    });
   });
 
   it("renders source and target language search buttons", () => {
