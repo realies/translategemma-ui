@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { languages, getLanguageName } from "~/lib/languages";
 
 const MAX_RECENTS = 4;
+const VALID_LANGUAGE_CODES = new Set(languages.map((l) => l.code));
 
 interface LanguageSelectorProps {
   value: string;
@@ -17,7 +18,15 @@ function loadRecents(storageKey: string, defaults: string[]): string[] {
     if (stored) {
       const parsed: unknown = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === "string")) {
-        return parsed;
+        const seen = new Set<string>();
+        const valid = parsed
+          .filter((code) => {
+            if (!VALID_LANGUAGE_CODES.has(code) || seen.has(code)) return false;
+            seen.add(code);
+            return true;
+          })
+          .slice(0, MAX_RECENTS);
+        if (valid.length > 0) return valid;
       }
     }
   } catch {

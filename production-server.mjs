@@ -122,7 +122,7 @@ const httpServer = createServer(async (req, res) => {
       const filePath = normalize(join(clientDir, url.pathname));
 
       // Prevent path traversal
-      if (!filePath.startsWith(clientDirWithSep) && filePath !== clientDir) {
+      if (!filePath.startsWith(clientDirWithSep)) {
         res.writeHead(403, { "Content-Type": "text/plain" });
         res.end("Forbidden");
         return;
@@ -144,7 +144,7 @@ const httpServer = createServer(async (req, res) => {
         res.end(content);
         return;
       } catch (err) {
-        if (err.code === "ENOENT") {
+        if (err.code === "ENOENT" || err.code === "EISDIR") {
           res.writeHead(404, { "Content-Type": "text/plain" });
           res.end("Not Found");
         } else {

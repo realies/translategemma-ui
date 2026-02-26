@@ -53,9 +53,10 @@ export function TranslationPanel() {
   }, []);
 
   const handleTranslate = useCallback(async () => {
-    if (!sourceText.trim()) return;
+    if (!sourceText.trim() || !targetLanguage) return;
 
-    // Cancel any pending request and start new one
+    // Cancel any pending debounce and start a new request
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     requestIdRef.current += 1;
     const currentRequestId = requestIdRef.current;
 
