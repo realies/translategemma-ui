@@ -154,7 +154,7 @@ export function LanguageSelector({
     [isOpen, focusedIndex, filteredLanguages, select, close]
   );
 
-  const selectedName = getLanguageName(value);
+  const selectedName = value ? getLanguageName(value) : "Select language";
 
   return (
     <div className="relative w-full min-w-0">

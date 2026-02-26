@@ -3,8 +3,8 @@ import { LanguageSelector } from "./LanguageSelector";
 import { translate } from "~/serverFunctions/translate";
 import { VALID_LANGUAGE_CODES } from "~/lib/languages";
 
-const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"];
-const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"];
+const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"] as const;
+const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"] as const;
 
 function setLocalStorage(key: string, value: string) {
   try {
@@ -35,15 +35,17 @@ export function TranslationPanel() {
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Restore language preferences from localStorage on mount (client-only)
+  // Restore language preferences from localStorage on mount (client-only).
+  // In incognito/strict private browsing localStorage may be empty or throw, so default target to first recent.
   useEffect(() => {
     try {
       const src = localStorage.getItem("srcLang");
       const tgt = localStorage.getItem("tgtLang");
       if (src && VALID_LANGUAGE_CODES.has(src)) setSourceLanguage(src);
       if (tgt && VALID_LANGUAGE_CODES.has(tgt)) setTargetLanguage(tgt);
+      else setTargetLanguage(DEFAULT_TARGET_RECENTS[0]);
     } catch {
-      // localStorage unavailable (e.g. private browsing with strict settings)
+      setTargetLanguage(DEFAULT_TARGET_RECENTS[0]);
     }
   }, []);
 
@@ -202,7 +204,7 @@ export function TranslationPanel() {
             }}
             excludeCode={targetLanguage}
             storageKey="srcRecents"
-            defaultRecents={DEFAULT_SOURCE_RECENTS}
+            defaultRecents={[...DEFAULT_SOURCE_RECENTS]}
           />
         </div>
 
@@ -231,7 +233,7 @@ export function TranslationPanel() {
             }}
             excludeCode={sourceLanguage}
             storageKey="tgtRecents"
-            defaultRecents={DEFAULT_TARGET_RECENTS}
+            defaultRecents={[...DEFAULT_TARGET_RECENTS]}
           />
         </div>
       </div>
