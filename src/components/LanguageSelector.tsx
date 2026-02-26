@@ -44,6 +44,7 @@ function saveRecents(storageKey: string, recents: string[]) {
 }
 
 function addToRecents(recents: string[], code: string): string[] {
+  if (!VALID_LANGUAGE_CODES.has(code)) return recents;
   const filtered = recents.filter((c) => c !== code);
   return [code, ...filtered].slice(0, MAX_RECENTS);
 }
@@ -106,7 +107,7 @@ export function LanguageSelector({
 
   // Keep value in recents when it changes externally (e.g. swap)
   useEffect(() => {
-    if (!value) return;
+    if (!value || !VALID_LANGUAGE_CODES.has(value)) return;
     setRecents((prev) => {
       const next = addToRecents(prev, value);
       saveRecents(storageKey, next);

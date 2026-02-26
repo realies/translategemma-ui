@@ -43,7 +43,12 @@ const trustProxy = process.env.TRUST_PROXY === "true";
 function getClientIp(req) {
   if (trustProxy) {
     const forwarded = req.headers["x-forwarded-for"];
-    if (forwarded) return forwarded.split(",")[0].trim();
+    if (forwarded) {
+      // Use the rightmost entry — appended by our trusted proxy, not spoofable by the client.
+      const parts = forwarded.split(",");
+      const last = parts[parts.length - 1].trim();
+      if (last) return last;
+    }
   }
   return req.socket.remoteAddress;
 }
