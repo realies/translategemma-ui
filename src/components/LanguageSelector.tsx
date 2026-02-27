@@ -7,16 +7,33 @@ const MAX_RECENTS = 4;
 /** Below this height the anchor is a language row (mobile), not a textarea panel (desktop). */
 const MOBILE_ANCHOR_THRESHOLD = 100;
 
+/** Minimum usable dropdown height before we flip above the anchor. */
+const MIN_DROPDOWN_HEIGHT = 160;
+
 function getDropdownPosition(rect: DOMRect) {
   if (rect.height < MOBILE_ANCHOR_THRESHOLD) {
-    const remaining = window.innerHeight - rect.bottom - 16;
+    const spaceBelow = window.innerHeight - rect.bottom - 16;
+    const spaceAbove = rect.top - 16;
     const maxHeight = Math.min(560, window.innerHeight * 0.7);
+
+    // Flip above the anchor when space below is too tight and there's more room above
+    if (spaceBelow < MIN_DROPDOWN_HEIGHT && spaceAbove > spaceBelow) {
+      const height = Math.min(spaceAbove, maxHeight);
+      return {
+        position: "fixed" as const,
+        top: rect.top - height - 8,
+        left: rect.left,
+        width: rect.width,
+        height,
+      };
+    }
+
     return {
       position: "fixed" as const,
       top: rect.bottom + 8,
       left: rect.left,
       width: rect.width,
-      height: Math.min(remaining, maxHeight),
+      height: Math.min(spaceBelow, maxHeight),
     };
   }
   return {
