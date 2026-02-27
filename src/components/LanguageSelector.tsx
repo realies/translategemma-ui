@@ -4,17 +4,41 @@ import { languages, getLanguageName, VALID_LANGUAGE_CODES } from "~/lib/language
 
 const MAX_RECENTS = 4;
 
+/** Below this height the anchor is a language row (mobile), not a textarea panel (desktop). */
+const MOBILE_ANCHOR_THRESHOLD = 100;
+
+function getDropdownPosition(rect: DOMRect) {
+  if (rect.height < MOBILE_ANCHOR_THRESHOLD) {
+    const remaining = window.innerHeight - rect.bottom - 16;
+    const maxHeight = Math.min(560, window.innerHeight * 0.7);
+    return {
+      position: "fixed" as const,
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+      height: Math.min(remaining, maxHeight),
+    };
+  }
+  return {
+    position: "fixed" as const,
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 interface LanguageSelectorProps {
   value: string;
   onChange: (code: string) => void;
   excludeCode?: string;
-  storageKey: string;
-  defaultRecents: string[];
+  recents: string[];
+  onRecentsChange: (next: string[]) => void;
   /** When set, dropdown is positioned/sized to match this element (e.g. textarea panel below). */
   dropdownAnchorRef?: RefObject<HTMLElement | null>;
 }
 
-function loadRecents(storageKey: string, defaults: string[]): string[] {
+export function loadRecents(storageKey: string, defaults: string[]): string[] {
   try {
     const stored = localStorage.getItem(storageKey);
     if (stored) {
@@ -37,7 +61,7 @@ function loadRecents(storageKey: string, defaults: string[]): string[] {
   return defaults;
 }
 
-function saveRecents(storageKey: string, recents: string[]) {
+export function saveRecents(storageKey: string, recents: string[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(recents));
   } catch {
@@ -45,7 +69,7 @@ function saveRecents(storageKey: string, recents: string[]) {
   }
 }
 
-function addToRecents(recents: string[], code: string): string[] {
+export function addToRecents(recents: string[], code: string): string[] {
   if (!VALID_LANGUAGE_CODES.has(code)) return recents;
   const filtered = recents.filter((c) => c !== code);
   return [code, ...filtered].slice(0, MAX_RECENTS);
@@ -55,11 +79,10 @@ export function LanguageSelector({
   value,
   onChange,
   excludeCode,
-  storageKey,
-  defaultRecents,
+  recents,
+  onRecentsChange,
   dropdownAnchorRef,
 }: LanguageSelectorProps) {
-  const [recents, setRecents] = useState<string[]>(() => loadRecents(storageKey, defaultRecents));
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
@@ -113,23 +136,11 @@ export function LanguageSelector({
   const select = useCallback(
     (code: string) => {
       onChange(code);
-      const next = addToRecents(recents, code);
-      setRecents(next);
-      saveRecents(storageKey, next);
+      onRecentsChange(addToRecents(recents, code));
       close();
     },
-    [recents, onChange, storageKey, close]
+    [recents, onChange, onRecentsChange, close]
   );
-
-  // Keep value in recents when it changes externally (e.g. swap)
-  useEffect(() => {
-    if (!value || !VALID_LANGUAGE_CODES.has(value)) return;
-    setRecents((prev) => {
-      const next = addToRecents(prev, value);
-      saveRecents(storageKey, next);
-      return next;
-    });
-  }, [value, storageKey]);
 
   // Move cursor to first result whenever search changes
   useEffect(() => {
@@ -173,47 +184,39 @@ export function LanguageSelector({
 
   const selectedName = value ? getLanguageName(value) : "Select language";
 
-  // When anchor is short (e.g. language row on mobile), position below it and overlay with viewport-based height; use anchor left/width so dropdown matches container margins
-  const dropdownStyle =
-    anchorRect &&
-    (typeof window !== "undefined" && anchorRect.height < 100
-      ? (() => {
-          const remaining = window.innerHeight - anchorRect.bottom - 16;
-          const maxHeight = Math.min(560, window.innerHeight * 0.7);
-          return {
-            position: "fixed" as const,
-            top: anchorRect.bottom + 8,
-            left: anchorRect.left,
-            width: anchorRect.width,
-            height: Math.min(remaining, maxHeight),
-          };
-        })()
-      : {
-          position: "fixed" as const,
-          top: anchorRect.top,
-          left: anchorRect.left,
-          width: anchorRect.width,
-          height: anchorRect.height,
-        });
+  const dropdownStyle = anchorRect ? getDropdownPosition(anchorRect) : undefined;
 
   return (
     <div className="relative w-full min-w-0">
-      <div className="flex min-w-0 items-center gap-1">
-        {/* Narrow: active language pill */}
+      <div className="flex min-w-0 items-center gap-1.5">
+        {/* Narrow: active language pill with search icon inside */}
         <button
           type="button"
           onClick={() => {
             setIsOpen(true);
           }}
-          className={`flex-1 truncate rounded-full px-3 py-1.5 text-left text-sm font-medium transition-colors md:hidden ${
+          className={`flex flex-1 items-center gap-1 rounded-2xl py-2 pr-2.5 pl-3.5 text-left text-[13px] font-medium transition-colors md:hidden ${
             isOpen
-              ? "bg-zinc-300 text-zinc-800 ring-1 ring-zinc-500 dark:bg-zinc-600 dark:text-zinc-100 dark:ring-zinc-400"
-              : "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
+              ? "bg-zinc-200 text-zinc-800 ring-1 ring-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-500"
+              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
           }`}
           aria-label="Select language"
           aria-expanded={isOpen}
         >
-          {selectedName}
+          <span className="truncate">{selectedName}</span>
+          <svg
+            className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-400 dark:text-zinc-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
         </button>
 
         {/* Wide: recent language pills — flex-1 pushes search icon to the right; mask fades edges when clipped */}
@@ -227,10 +230,10 @@ export function LanguageSelector({
                 onClick={() => {
                   select(code);
                 }}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                className={`rounded-2xl px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
                   isActive
-                    ? "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
+                    ? "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 hover:bg-zinc-100/60 dark:text-zinc-400 dark:hover:bg-zinc-800/60"
                 }`}
               >
                 {getLanguageName(code)}
@@ -239,14 +242,14 @@ export function LanguageSelector({
           })}
         </div>
 
-        {/* Search icon — always at right end */}
+        {/* Search icon — desktop only (mobile icon is inside the pill) */}
         <button
           type="button"
           onClick={() => {
             setIsOpen(true);
           }}
           aria-label="Search languages"
-          className="shrink-0 rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="hidden shrink-0 rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 md:block dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
@@ -272,12 +275,12 @@ export function LanguageSelector({
           <div
             className={
               anchorRect
-                ? "z-20 flex flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
-                : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800"
+                ? "z-20 flex flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
+                : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
             }
             style={dropdownStyle ?? undefined}
           >
-            <div className="shrink-0 p-2">
+            <div className="shrink-0 p-2.5">
               <input
                 type="text"
                 placeholder="Search languages..."
@@ -287,13 +290,13 @@ export function LanguageSelector({
                 }}
                 onKeyDown={handleKeyDown}
                 aria-label="Search languages"
-                className="w-full rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm focus:outline-none dark:border-zinc-600 dark:bg-zinc-700"
+                className="w-full rounded-xl bg-zinc-100/80 px-3.5 py-2 text-[13px] focus:outline-none dark:bg-zinc-700/80"
                 autoFocus
               />
             </div>
             <ul
               ref={listRef}
-              className={`overflow-auto py-1 pr-2 [scrollbar-gutter:stable] ${anchorRect ? "min-h-0 flex-1" : "max-h-60"}`}
+              className={`overflow-auto px-1.5 pb-1.5 [scrollbar-gutter:stable] ${anchorRect ? "min-h-0 flex-1" : "max-h-60"}`}
               role="listbox"
             >
               {filteredLanguages.map((lang, index) => (
@@ -303,22 +306,24 @@ export function LanguageSelector({
                     onClick={() => {
                       select(lang.code);
                     }}
-                    className={`flex w-full items-center gap-2 px-4 py-2 text-left transition-colors ${
+                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
                       index === focusedIndex
-                        ? "bg-zinc-200 dark:bg-zinc-600"
-                        : "hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                        ? "bg-zinc-100 dark:bg-zinc-700"
+                        : "hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
                     }`}
                   >
-                    <span className="font-medium">{lang.name}</span>
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <span className="text-[13px] font-medium">{lang.name}</span>
+                    <span className="text-[13px] text-zinc-400 dark:text-zinc-500">
                       {lang.nativeName}
                     </span>
-                    <span className="ml-auto text-xs text-zinc-400">{lang.code}</span>
+                    <span className="ml-auto text-xs text-zinc-300 dark:text-zinc-600">
+                      {lang.code}
+                    </span>
                   </button>
                 </li>
               ))}
               {filteredLanguages.length === 0 && (
-                <li className="px-4 py-2 text-sm text-zinc-500">No languages found</li>
+                <li className="px-3 py-2 text-[13px] text-zinc-400">No languages found</li>
               )}
             </ul>
           </div>

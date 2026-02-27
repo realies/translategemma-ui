@@ -1,15 +1,11 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from "react";
-import { LanguageSelector } from "./LanguageSelector";
+import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
+import { LanguageSelector, loadRecents, addToRecents, saveRecents } from "./LanguageSelector";
 import { translate } from "~/serverFunctions/translate";
 import { VALID_LANGUAGE_CODES } from "~/lib/languages";
 
-const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"] as const;
-const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"] as const;
-
-const srcLang = localStorage.getItem("srcLang") ?? "";
-const src = VALID_LANGUAGE_CODES.has(srcLang) ? srcLang : DEFAULT_SOURCE_RECENTS[0];
-const tgtLang = localStorage.getItem("tgtLang") ?? "";
-const tgt = VALID_LANGUAGE_CODES.has(tgtLang) ? tgtLang : DEFAULT_TARGET_RECENTS[0];
+/** Default recent language codes; exported for tests. */
+export const DEFAULT_SOURCE_RECENTS = ["en", "fr_FR", "de_DE", "es_MX"] as const;
+export const DEFAULT_TARGET_RECENTS = ["fr_FR", "de_DE", "es_MX", "ja_JP"] as const;
 
 function setLocalStorage(key: string, value: string) {
   try {
@@ -23,13 +19,92 @@ export function TranslationPanel() {
   const [sourceText, setSourceText] = useState("");
   const [translatedText, setTranslatedText] = useState("");
 
-  // Stable array refs for defaultRecents so LanguageSelector's mount-only useEffect doesn't re-run every render.
-  const sourceDefaultRecents = useMemo(() => [...DEFAULT_SOURCE_RECENTS], []);
-  const targetDefaultRecents = useMemo(() => [...DEFAULT_TARGET_RECENTS], []);
+  // SSR-safe: same initial state on server and client. Single state so restore + hasRestored update in one commit — fade-in only after content is ready.
+  const [languageState, setLanguageState] = useState<{
+    sourceLanguage: string;
+    targetLanguage: string;
+    sourceRecents: string[];
+    targetRecents: string[];
+    hasRestored: boolean;
+  }>({
+    sourceLanguage: DEFAULT_SOURCE_RECENTS[0],
+    targetLanguage: DEFAULT_TARGET_RECENTS[0],
+    sourceRecents: [...DEFAULT_SOURCE_RECENTS],
+    targetRecents: [...DEFAULT_TARGET_RECENTS],
+    hasRestored: false,
+  });
+  const { sourceLanguage, targetLanguage, sourceRecents, targetRecents, hasRestored } =
+    languageState;
 
-  const [sourceLanguage, setSourceLanguage] = useState<string>(src);
-  const [targetLanguage, setTargetLanguage] = useState<string>(tgt);
+  useLayoutEffect(() => {
+    try {
+      const storedSrc = localStorage.getItem("srcLang");
+      const storedTgt = localStorage.getItem("tgtLang");
+      const src =
+        storedSrc && VALID_LANGUAGE_CODES.has(storedSrc) ? storedSrc : DEFAULT_SOURCE_RECENTS[0];
+      const tgt =
+        storedTgt && VALID_LANGUAGE_CODES.has(storedTgt) ? storedTgt : DEFAULT_TARGET_RECENTS[0];
+      const loadedSourceRecents = loadRecents("srcRecents", [...DEFAULT_SOURCE_RECENTS]);
+      const loadedTargetRecents = loadRecents("tgtRecents", [...DEFAULT_TARGET_RECENTS]);
+      // Normalize order so selected language is first; avoids "keep value in recents" effect firing after restore (extra render)
+      const next = {
+        sourceLanguage: src,
+        targetLanguage: tgt,
+        sourceRecents: addToRecents(loadedSourceRecents, src),
+        targetRecents: addToRecents(loadedTargetRecents, tgt),
+        hasRestored: true,
+      };
+      setLanguageState(next);
+      // Set isWideView in same tick so we don't get an extra render from the matchMedia useEffect
+      const mql = window.matchMedia("(min-width: 768px)");
+      setIsWideView(mql.matches);
+    } catch {
+      setLanguageState((prev) => ({ ...prev, hasRestored: true }));
+    }
+  }, []);
+
+  const setSourceLanguage = useCallback((code: string) => {
+    setLanguageState((prev) => ({ ...prev, sourceLanguage: code }));
+  }, []);
+  const setTargetLanguage = useCallback((code: string) => {
+    setLanguageState((prev) => ({ ...prev, targetLanguage: code }));
+  }, []);
+  const setSourceRecents = useCallback((next: string[]) => {
+    setLanguageState((prev) => ({ ...prev, sourceRecents: next }));
+  }, []);
+  const setTargetRecents = useCallback((next: string[]) => {
+    setLanguageState((prev) => ({ ...prev, targetRecents: next }));
+  }, []);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Keep value in recents when it changes externally (e.g. swap); skip if already first to avoid reorder flash after restore
+  useEffect(() => {
+    if (
+      !sourceLanguage ||
+      !VALID_LANGUAGE_CODES.has(sourceLanguage) ||
+      sourceRecents[0] === sourceLanguage
+    )
+      return;
+    setLanguageState((prev) => {
+      const next = addToRecents(prev.sourceRecents, sourceLanguage);
+      saveRecents("srcRecents", next);
+      return { ...prev, sourceRecents: next };
+    });
+  }, [sourceLanguage, sourceRecents]);
+  useEffect(() => {
+    if (
+      !targetLanguage ||
+      !VALID_LANGUAGE_CODES.has(targetLanguage) ||
+      targetRecents[0] === targetLanguage
+    )
+      return;
+    setLanguageState((prev) => {
+      const next = addToRecents(prev.targetRecents, targetLanguage);
+      saveRecents("tgtRecents", next);
+      return { ...prev, targetRecents: next };
+    });
+  }, [targetLanguage, targetRecents]);
+
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<{
     duration?: number;
@@ -204,59 +279,69 @@ export function TranslationPanel() {
 
   return (
     <div className="mx-auto w-full max-w-5xl">
-      {/* Language selectors */}
-      <div ref={languageRowRef} className="mb-4 flex items-center gap-2">
-        <div className="min-w-0 flex-1">
-          <LanguageSelector
-            value={sourceLanguage}
-            onChange={(code) => {
-              setSourceLanguage(code);
-              setLocalStorage("srcLang", code);
-            }}
-            excludeCode={targetLanguage}
-            storageKey="srcRecents"
-            defaultRecents={sourceDefaultRecents}
-            dropdownAnchorRef={isWideView ? sourcePanelRef : languageRowRef}
-          />
-        </div>
+      {/* Language selectors — only mount when restored so DOM never has default pill text (avoids flash) */}
+      <div ref={languageRowRef} className="mb-3 flex min-h-10 items-center gap-3">
+        {hasRestored ? (
+          <div className="fade-in flex min-w-0 flex-1 items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <LanguageSelector
+                value={sourceLanguage}
+                onChange={(code) => {
+                  setSourceLanguage(code);
+                  setLocalStorage("srcLang", code);
+                }}
+                excludeCode={targetLanguage}
+                recents={sourceRecents}
+                onRecentsChange={(next) => {
+                  setSourceRecents(next);
+                  saveRecents("srcRecents", next);
+                }}
+                dropdownAnchorRef={isWideView ? sourcePanelRef : languageRowRef}
+              />
+            </div>
 
-        <button
-          type="button"
-          onClick={handleSwapLanguages}
-          className="rounded-full p-2 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
-          title="Swap languages"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
-            />
-          </svg>
-        </button>
+            <button
+              type="button"
+              onClick={handleSwapLanguages}
+              className="rounded-full p-2 text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-500 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
+              title="Swap languages"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"
+                />
+              </svg>
+            </button>
 
-        <div className="min-w-0 flex-1">
-          <LanguageSelector
-            value={targetLanguage}
-            onChange={(code) => {
-              setTargetLanguage(code);
-              setLocalStorage("tgtLang", code);
-            }}
-            excludeCode={sourceLanguage}
-            storageKey="tgtRecents"
-            defaultRecents={targetDefaultRecents}
-            dropdownAnchorRef={isWideView ? targetPanelRef : languageRowRef}
-          />
-        </div>
+            <div className="min-w-0 flex-1">
+              <LanguageSelector
+                value={targetLanguage}
+                onChange={(code) => {
+                  setTargetLanguage(code);
+                  setLocalStorage("tgtLang", code);
+                }}
+                excludeCode={sourceLanguage}
+                recents={targetRecents}
+                onRecentsChange={(next) => {
+                  setTargetRecents(next);
+                  saveRecents("tgtRecents", next);
+                }}
+                dropdownAnchorRef={isWideView ? targetPanelRef : languageRowRef}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {/* Text areas */}
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 md:grid-cols-2">
         {/* Source text */}
         <div
           ref={sourcePanelRef}
-          className="flex flex-col rounded-lg border border-zinc-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-800"
+          className="flex flex-col rounded-2xl bg-white shadow-sm ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
         >
           <textarea
             ref={textareaRef}
@@ -265,13 +350,13 @@ export function TranslationPanel() {
               setSourceText(e.target.value);
             }}
             placeholder="Enter text to translate..."
-            className="min-h-48 w-full resize-none overflow-hidden bg-transparent p-4 text-lg focus:outline-none"
+            className="min-h-48 w-full resize-none overflow-hidden bg-transparent p-5 text-lg focus:outline-none"
           />
-          <div className="flex h-10 items-center justify-end gap-2 border-t border-zinc-100 px-3 dark:border-zinc-800">
+          <div className="flex h-10 items-center justify-end gap-3 border-t border-zinc-100/60 px-4 dark:border-zinc-700/40">
             <button
               type="button"
               onClick={handleClear}
-              className={`rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300 ${!sourceText ? "invisible" : ""}`}
+              className={`rounded-full p-1 text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-500 dark:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-400 ${!sourceText ? "invisible" : ""}`}
               title="Clear"
             >
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -283,17 +368,19 @@ export function TranslationPanel() {
                 />
               </svg>
             </button>
-            <span className="text-sm text-zinc-400">{sourceText.length} chars</span>
+            <span className="text-xs text-zinc-300 dark:text-zinc-600">
+              {sourceText.length} chars
+            </span>
           </div>
         </div>
 
         {/* Translated text */}
         <div
           ref={targetPanelRef}
-          className="flex flex-col rounded-lg border border-zinc-100 bg-zinc-50 shadow-sm dark:border-zinc-800 dark:bg-zinc-900"
+          className="flex flex-col rounded-2xl bg-zinc-50 shadow-sm ring-1 ring-zinc-900/5 dark:bg-zinc-900 dark:ring-zinc-100/10"
         >
           <div
-            className={`min-h-48 flex-1 p-4 text-lg whitespace-pre-wrap ${
+            className={`min-h-48 flex-1 p-5 text-lg whitespace-pre-wrap ${
               isLoading ? "streaming-cursor" : ""
             }`}
           >
@@ -304,14 +391,14 @@ export function TranslationPanel() {
             ) : isLoading ? (
               <span className="text-zinc-400">Translating...</span>
             ) : (
-              <span className="text-zinc-400">Translation will appear here</span>
+              <span className="text-zinc-300 dark:text-zinc-600">Translation will appear here</span>
             )}
           </div>
-          <div className="flex h-10 items-center justify-end gap-2 border-t border-zinc-100 px-3 dark:border-zinc-800">
+          <div className="flex h-10 items-center justify-end gap-3 border-t border-zinc-100/60 px-4 dark:border-zinc-700/40">
             <button
               type="button"
               onClick={handleCopy}
-              className={`rounded-md p-1 transition-colors ${copied ? "text-green-500" : "text-zinc-400 hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-300"} ${!translatedText ? "invisible" : ""}`}
+              className={`rounded-full p-1 transition-colors ${copied ? "text-green-500" : "text-zinc-300 hover:bg-zinc-100 hover:text-zinc-500 dark:text-zinc-600 dark:hover:bg-zinc-700 dark:hover:text-zinc-400"} ${!translatedText ? "invisible" : ""}`}
               title={copied ? "Copied!" : "Copy to clipboard"}
             >
               {copied ? (
@@ -335,8 +422,8 @@ export function TranslationPanel() {
               )}
             </button>
             {stats && (
-              <span className="text-xs text-zinc-400">
-                {stats.duration}s{stats.tokens !== undefined && ` • ${String(stats.tokens)} tokens`}
+              <span className="text-xs text-zinc-300 dark:text-zinc-600">
+                {stats.duration}s{stats.tokens !== undefined && ` · ${String(stats.tokens)} tokens`}
               </span>
             )}
           </div>
