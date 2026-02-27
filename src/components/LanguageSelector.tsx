@@ -118,10 +118,10 @@ export function LanguageSelector({
       setAnchorRect(el.getBoundingClientRect());
     };
     measure();
-    window.addEventListener("scroll", measure, true);
-    window.addEventListener("resize", measure);
+    window.addEventListener("scroll", measure, { capture: true, passive: true });
+    window.addEventListener("resize", measure, { passive: true });
     return () => {
-      window.removeEventListener("scroll", measure, true);
+      window.removeEventListener("scroll", measure, { capture: true });
       window.removeEventListener("resize", measure);
     };
   }, [useAnchor, dropdownAnchorRef]);
