@@ -295,7 +295,7 @@ export function LanguageSelector({
                 ? "z-20 flex flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
                 : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
             }
-            style={dropdownStyle ?? undefined}
+            style={dropdownStyle}
           >
             <div className="shrink-0 p-2.5">
               <input
