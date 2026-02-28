@@ -3,7 +3,6 @@ import { fileURLToPath } from "node:url";
 import js from "@eslint/js";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
-import reactPlugin from "eslint-plugin-react";
 import tseslint from "typescript-eslint";
 import eslintConfigPrettier from "eslint-config-prettier";
 
@@ -30,12 +29,9 @@ export default tseslint.config(
       },
     },
     plugins: {
-      react: reactPlugin,
       "react-hooks": reactHooks,
     },
     rules: {
-      ...reactPlugin.configs.recommended.rules,
-      ...reactPlugin.configs["jsx-runtime"].rules,
       ...reactHooks.configs.recommended.rules,
       "@typescript-eslint/no-unused-vars": [
         "error",
@@ -49,12 +45,6 @@ export default tseslint.config(
         "error",
         { checksVoidReturn: { attributes: false } },
       ],
-      "react/prop-types": "off",
-    },
-    settings: {
-      react: {
-        version: "detect",
-      },
     },
   },
   eslintConfigPrettier
