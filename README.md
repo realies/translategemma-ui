@@ -6,7 +6,7 @@
 
 Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technology/developers-tools/translategemma/), Google's open translation model.
 
-![TranslateGemma UI](https://github.com/user-attachments/assets/8c58730a-5fe2-4e0c-a327-08db3ba49346)
+![TranslateGemma UI](https://github.com/user-attachments/assets/2b8fa87a-a251-4725-a48e-d0a500174871)
 
 ## Features
 
