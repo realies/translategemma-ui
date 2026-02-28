@@ -81,7 +81,7 @@ describe("LanguageSelector", () => {
     await user.click(screen.getByRole("button", { name: "Search languages" }));
 
     const options = screen.getAllByRole("option");
-    const englishOption = options.find((opt) => opt.textContent?.includes("English"));
+    const englishOption = options.find((opt) => opt.textContent.includes("English"));
     expect(englishOption).toHaveAttribute("aria-selected", "true");
   });
 
