@@ -18,7 +18,7 @@ function getDropdownPosition(rect: DOMRect) {
 
     // Flip above the anchor when space below is too tight and there's more room above
     if (spaceBelow < MIN_DROPDOWN_HEIGHT && spaceAbove > spaceBelow) {
-      const height = Math.min(spaceAbove, maxHeight);
+      const height = Math.max(Math.min(spaceAbove, maxHeight), 0);
       return {
         position: "fixed" as const,
         top: rect.top - height - 8,
@@ -33,7 +33,7 @@ function getDropdownPosition(rect: DOMRect) {
       top: rect.bottom + 8,
       left: rect.left,
       width: rect.width,
-      height: Math.min(spaceBelow, maxHeight),
+      height: Math.max(Math.min(spaceBelow, maxHeight), 0),
     };
   }
   return {

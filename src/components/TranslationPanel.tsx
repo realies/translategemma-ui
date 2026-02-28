@@ -293,6 +293,9 @@ export function TranslationPanel() {
                 value={sourceLanguage}
                 onChange={(code) => {
                   if (code === targetLanguage) {
+                    cancelPendingRequest();
+                    setError(null);
+                    setStats(null);
                     setTargetLanguage(sourceLanguage);
                     setLocalStorage("tgtLang", sourceLanguage);
                     setSourceText(translatedText);
@@ -331,6 +334,9 @@ export function TranslationPanel() {
                 value={targetLanguage}
                 onChange={(code) => {
                   if (code === sourceLanguage) {
+                    cancelPendingRequest();
+                    setError(null);
+                    setStats(null);
                     setSourceLanguage(targetLanguage);
                     setLocalStorage("srcLang", targetLanguage);
                     setSourceText(translatedText);
