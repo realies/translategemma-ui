@@ -8,22 +8,57 @@ body {
   @apply bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar — thin, minimal */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-zinc-100 dark:bg-zinc-800;
+  @apply bg-transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply rounded-full bg-zinc-300 dark:bg-zinc-600;
+  @apply rounded-full bg-zinc-300/60 dark:bg-zinc-600/60;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  @apply bg-zinc-400 dark:bg-zinc-500;
+  @apply bg-zinc-400/80 dark:bg-zinc-500/80;
+}
+
+/* Fade-in for language row after restore */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.fade-in {
+  animation: fade-in 0.35s ease-out forwards;
+}
+
+/* Pill enter — new tab grows from 0 width */
+@keyframes pill-enter {
+  from {
+    max-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+    opacity: 0;
+  }
+  to {
+    max-width: 12rem;
+    padding-left: 0.875rem;
+    padding-right: 0.875rem;
+    opacity: 1;
+  }
+}
+
+.pill-enter {
+  animation: pill-enter 0.3s ease-out forwards;
+  overflow: hidden;
 }
 
 /* Streaming animation */

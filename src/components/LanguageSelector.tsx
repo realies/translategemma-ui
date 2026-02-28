@@ -1,17 +1,60 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from "react";
+import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
+import type { RefObject } from "react";
 import { languages, getLanguageName, VALID_LANGUAGE_CODES } from "~/lib/languages";
 
 const MAX_RECENTS = 4;
 
+/** Below this height the anchor is a language row (mobile), not a textarea panel (desktop). */
+const MOBILE_ANCHOR_THRESHOLD = 100;
+
+/** Minimum usable dropdown height before we flip above the anchor. */
+const MIN_DROPDOWN_HEIGHT = 160;
+
+function getDropdownPosition(rect: DOMRect) {
+  if (rect.height < MOBILE_ANCHOR_THRESHOLD) {
+    const spaceBelow = window.innerHeight - rect.bottom - 16;
+    const spaceAbove = rect.top - 16;
+    const maxHeight = Math.min(560, window.innerHeight * 0.7);
+
+    // Flip above the anchor when space below is too tight and there's more room above
+    if (spaceBelow < MIN_DROPDOWN_HEIGHT && spaceAbove > spaceBelow) {
+      const height = Math.max(Math.min(spaceAbove, maxHeight), 0);
+      return {
+        position: "fixed" as const,
+        top: rect.top - height - 8,
+        left: rect.left,
+        width: rect.width,
+        height,
+      };
+    }
+
+    return {
+      position: "fixed" as const,
+      top: rect.bottom + 8,
+      left: rect.left,
+      width: rect.width,
+      height: Math.max(Math.min(spaceBelow, maxHeight), 0),
+    };
+  }
+  return {
+    position: "fixed" as const,
+    top: rect.top,
+    left: rect.left,
+    width: rect.width,
+    height: rect.height,
+  };
+}
+
 interface LanguageSelectorProps {
   value: string;
   onChange: (code: string) => void;
-  excludeCode?: string;
-  storageKey: string;
-  defaultRecents: string[];
+  recents: string[];
+  onRecentsChange: (next: string[]) => void;
+  /** When set, dropdown is positioned/sized to match this element (e.g. textarea panel below). */
+  dropdownAnchorRef?: RefObject<HTMLElement | null>;
 }
 
-function loadRecents(storageKey: string, defaults: string[]): string[] {
+export function loadRecents(storageKey: string, defaults: string[]): string[] {
   try {
     const stored = localStorage.getItem(storageKey);
     if (stored) {
@@ -34,7 +77,7 @@ function loadRecents(storageKey: string, defaults: string[]): string[] {
   return defaults;
 }
 
-function saveRecents(storageKey: string, recents: string[]) {
+export function saveRecents(storageKey: string, recents: string[]) {
   try {
     localStorage.setItem(storageKey, JSON.stringify(recents));
   } catch {
@@ -42,7 +85,7 @@ function saveRecents(storageKey: string, recents: string[]) {
   }
 }
 
-function addToRecents(recents: string[], code: string): string[] {
+export function addToRecents(recents: string[], code: string): string[] {
   if (!VALID_LANGUAGE_CODES.has(code)) return recents;
   const filtered = recents.filter((c) => c !== code);
   return [code, ...filtered].slice(0, MAX_RECENTS);
@@ -51,33 +94,96 @@ function addToRecents(recents: string[], code: string): string[] {
 export function LanguageSelector({
   value,
   onChange,
-  excludeCode,
-  storageKey,
-  defaultRecents,
+  recents,
+  onRecentsChange,
+  dropdownAnchorRef,
 }: LanguageSelectorProps) {
-  // Initialized with safe SSR defaults; localStorage values applied on mount via useEffect
-  const [recents, setRecents] = useState<string[]>(defaultRecents);
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
+  const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const tabContainerRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [highlightStyle, setHighlightStyle] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
 
-  const visibleTabs = useMemo(
-    () => recents.filter((c) => c !== excludeCode).slice(0, MAX_RECENTS),
-    [recents, excludeCode]
-  );
+  const useAnchor = Boolean(isOpen && dropdownAnchorRef?.current);
+
+  useLayoutEffect(() => {
+    if (!useAnchor || !dropdownAnchorRef?.current) {
+      setAnchorRect(null);
+      return;
+    }
+    const el = dropdownAnchorRef.current;
+    const measure = () => {
+      setAnchorRect(el.getBoundingClientRect());
+    };
+    measure();
+    window.addEventListener("scroll", measure, { capture: true, passive: true });
+    window.addEventListener("resize", measure, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", measure, { capture: true });
+      window.removeEventListener("resize", measure);
+    };
+  }, [useAnchor, dropdownAnchorRef]);
+
+  // Measure active tab position for sliding highlight
+  const measureHighlight = useCallback(() => {
+    const container = tabContainerRef.current;
+    const activeTab = tabRefs.current.get(value);
+    if (!container || !activeTab) {
+      setHighlightStyle(null);
+      return;
+    }
+    const containerRect = container.getBoundingClientRect();
+    const tabRect = activeTab.getBoundingClientRect();
+    setHighlightStyle({
+      left: tabRect.left - containerRect.left,
+      width: tabRect.width,
+    });
+  }, [value]);
+
+  useLayoutEffect(() => {
+    measureHighlight();
+  }, [measureHighlight, recents]);
+
+  // Remeasure highlight on resize so it stays aligned
+  useEffect(() => {
+    window.addEventListener("resize", measureHighlight, { passive: true });
+    return () => {
+      window.removeEventListener("resize", measureHighlight);
+    };
+  }, [measureHighlight]);
+
+  const visibleTabs = useMemo(() => recents.slice(0, MAX_RECENTS), [recents]);
+
+  // Track which tabs are newly added (for enter animation)
+  const prevVisibleTabsRef = useRef<string[] | null>(null);
+  const [newTabCodes, setNewTabCodes] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (prevVisibleTabsRef.current !== null) {
+      const prevSet = new Set(prevVisibleTabsRef.current);
+      const added = visibleTabs.filter((code) => !prevSet.has(code));
+      if (added.length > 0) {
+        setNewTabCodes(new Set(added));
+      }
+    }
+    prevVisibleTabsRef.current = visibleTabs;
+  }, [visibleTabs]);
 
   const filteredLanguages = useMemo(
     () =>
-      languages
-        .filter((lang) => lang.code !== excludeCode)
-        .filter(
-          (lang) =>
-            lang.name.toLowerCase().includes(search.toLowerCase()) ||
-            lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
-            lang.code.toLowerCase().includes(search.toLowerCase())
-        ),
-    [search, excludeCode]
+      languages.filter(
+        (lang) =>
+          lang.name.toLowerCase().includes(search.toLowerCase()) ||
+          lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
+          lang.code.toLowerCase().includes(search.toLowerCase())
+      ),
+    [search]
   );
 
   const close = useCallback(() => {
@@ -89,30 +195,15 @@ export function LanguageSelector({
   const select = useCallback(
     (code: string) => {
       onChange(code);
-      const next = addToRecents(recents, code);
-      setRecents(next);
-      saveRecents(storageKey, next);
+      // Only reorder recents when picking a new language (not already in visible tabs)
+      // so the tab row stays stable for the sliding highlight animation
+      if (!recents.includes(code)) {
+        onRecentsChange(addToRecents(recents, code));
+      }
       close();
     },
-    [recents, onChange, storageKey, close]
+    [recents, onChange, onRecentsChange, close]
   );
-
-  // Restore recents from localStorage on mount (client-only).
-  // storageKey and defaultRecents are module-level constants — stable references.
-  useEffect(() => {
-    const stored = loadRecents(storageKey, defaultRecents);
-    setRecents(stored);
-  }, [storageKey, defaultRecents]);
-
-  // Keep value in recents when it changes externally (e.g. swap)
-  useEffect(() => {
-    if (!value || !VALID_LANGUAGE_CODES.has(value)) return;
-    setRecents((prev) => {
-      const next = addToRecents(prev, value);
-      saveRecents(storageKey, next);
-      return next;
-    });
-  }, [value, storageKey]);
 
   // Move cursor to first result whenever search changes
   useEffect(() => {
@@ -154,39 +245,82 @@ export function LanguageSelector({
     [isOpen, focusedIndex, filteredLanguages, select, close]
   );
 
-  const selectedName = getLanguageName(value);
+  const selectedName = value ? getLanguageName(value) : "Select language";
+
+  const dropdownStyle = anchorRect ? getDropdownPosition(anchorRect) : undefined;
 
   return (
     <div className="relative w-full min-w-0">
-      <div className="flex min-w-0 items-center gap-1">
-        {/* Narrow: active language pill */}
+      {/* Unified pill container — mobile shows only selected language; wide shows recent tabs */}
+      <div
+        className={`flex min-w-0 items-center overflow-hidden rounded-2xl transition-colors ${
+          isOpen ? "bg-zinc-200 dark:bg-zinc-700" : "bg-zinc-100 dark:bg-zinc-800"
+        }`}
+      >
+        {/* Mobile: single selected language */}
         <button
           type="button"
           onClick={() => {
             setIsOpen(true);
           }}
-          className="flex-1 truncate rounded-full bg-zinc-200 px-3 py-1.5 text-left text-sm font-medium text-zinc-800 md:hidden dark:bg-zinc-700 dark:text-zinc-100"
+          className="flex min-w-0 flex-1 items-center py-2 pr-1 pl-3.5 text-left text-[13px] font-medium text-zinc-700 md:hidden dark:text-zinc-200"
           aria-label="Select language"
+          aria-expanded={isOpen}
         >
-          {selectedName}
+          <span className="truncate">{selectedName}</span>
         </button>
 
-        {/* Wide: recent language pills — flex-1 pushes search icon to the right */}
-        <div className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden md:flex">
+        {/* Wide: recent language tabs with sliding highlight */}
+        <div
+          ref={tabContainerRef}
+          className="relative hidden min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex"
+        >
+          {/* Sliding highlight behind active tab */}
+          {/* Sliding highlight — hidden while active tab is animating in */}
+          {highlightStyle && !newTabCodes.has(value) && (
+            <div
+              className="absolute top-0 bottom-0 rounded-2xl bg-white/50 transition-[left,width] duration-300 ease-out dark:bg-zinc-600/50"
+              style={{
+                left: highlightStyle.left,
+                width: highlightStyle.width,
+              }}
+            />
+          )}
           {visibleTabs.map((code) => {
             const isActive = code === value;
+            const isNew = newTabCodes.has(code);
             return (
               <button
                 key={code}
+                ref={(el) => {
+                  if (el) {
+                    tabRefs.current.set(code, el);
+                  } else {
+                    tabRefs.current.delete(code);
+                  }
+                }}
                 type="button"
                 onClick={() => {
                   select(code);
                 }}
-                className={`rounded-full px-3 py-1.5 text-sm font-medium whitespace-nowrap transition-colors ${
+                onAnimationEnd={
+                  isNew
+                    ? () => {
+                        setNewTabCodes(new Set());
+                        measureHighlight();
+                      }
+                    : undefined
+                }
+                className={[
+                  "relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                  isNew ? "pill-enter" : "",
                   isActive
-                    ? "bg-zinc-200 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-100"
-                    : "text-zinc-600 hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-800"
-                }`}
+                    ? "text-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+                  isActive && isNew ? "bg-white/50 dark:bg-zinc-600/50" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {getLanguageName(code)}
               </button>
@@ -194,16 +328,16 @@ export function LanguageSelector({
           })}
         </div>
 
-        {/* Search icon — always at right end */}
+        {/* Search icon — always visible, right-aligned inside the pill */}
         <button
           type="button"
           onClick={() => {
             setIsOpen(true);
           }}
           aria-label="Search languages"
-          className="shrink-0 rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="mr-1 shrink-0 rounded-full p-2 text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -214,7 +348,7 @@ export function LanguageSelector({
         </button>
       </div>
 
-      {/* Dropdown — full width of column, aligned below */}
+      {/* Dropdown — when anchor provided, match its position/size (textarea panel); else absolute below trigger */}
       {isOpen && (
         <>
           <div
@@ -224,8 +358,15 @@ export function LanguageSelector({
               close();
             }}
           />
-          <div className="absolute top-full left-0 z-20 mt-2 w-full min-w-64 rounded-lg border border-zinc-100 bg-white shadow-lg dark:border-zinc-800 dark:bg-zinc-800">
-            <div className="p-2">
+          <div
+            className={
+              anchorRect
+                ? "z-20 flex flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
+                : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
+            }
+            style={dropdownStyle}
+          >
+            <div className="shrink-0 p-2.5">
               <input
                 type="text"
                 placeholder="Search languages..."
@@ -235,11 +376,15 @@ export function LanguageSelector({
                 }}
                 onKeyDown={handleKeyDown}
                 aria-label="Search languages"
-                className="w-full rounded-md border border-zinc-100 bg-zinc-50 px-3 py-2 text-sm focus:outline-none dark:border-zinc-600 dark:bg-zinc-700"
+                className="w-full rounded-xl bg-zinc-100/80 px-3.5 py-2 text-[13px] focus:outline-none dark:bg-zinc-700/80"
                 autoFocus
               />
             </div>
-            <ul ref={listRef} className="max-h-60 overflow-auto py-1" role="listbox">
+            <ul
+              ref={listRef}
+              className={`overflow-auto px-1.5 pb-1.5 [scrollbar-gutter:stable] ${anchorRect ? "min-h-0 flex-1" : "max-h-60"}`}
+              role="listbox"
+            >
               {filteredLanguages.map((lang, index) => (
                 <li key={lang.code} role="option" aria-selected={lang.code === value}>
                   <button
@@ -247,22 +392,24 @@ export function LanguageSelector({
                     onClick={() => {
                       select(lang.code);
                     }}
-                    className={`flex w-full items-center gap-2 px-4 py-2 text-left transition-colors ${
+                    className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition-colors ${
                       index === focusedIndex
-                        ? "bg-zinc-200 dark:bg-zinc-600"
-                        : "hover:bg-zinc-100 dark:hover:bg-zinc-700"
+                        ? "bg-zinc-100 dark:bg-zinc-700"
+                        : "hover:bg-zinc-50 dark:hover:bg-zinc-700/50"
                     }`}
                   >
-                    <span className="font-medium">{lang.name}</span>
-                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                    <span className="text-[13px] font-medium">{lang.name}</span>
+                    <span className="text-[13px] text-zinc-400 dark:text-zinc-500">
                       {lang.nativeName}
                     </span>
-                    <span className="ml-auto text-xs text-zinc-400">{lang.code}</span>
+                    <span className="ml-auto text-xs text-zinc-300 dark:text-zinc-600">
+                      {lang.code}
+                    </span>
                   </button>
                 </li>
               ))}
               {filteredLanguages.length === 0 && (
-                <li className="px-4 py-2 text-sm text-zinc-500">No languages found</li>
+                <li className="px-3 py-2 text-[13px] text-zinc-400">No languages found</li>
               )}
             </ul>
           </div>

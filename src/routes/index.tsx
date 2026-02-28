@@ -10,7 +10,7 @@ export const Route = createFileRoute("/")({
 
 function HomePage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-zinc-50 to-zinc-100 px-4 py-8 dark:from-zinc-950 dark:to-zinc-900">
+    <div className="min-h-screen px-5 py-10 dark:bg-zinc-950">
       <TranslationPanel />
     </div>
   );
