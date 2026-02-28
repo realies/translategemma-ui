@@ -215,20 +215,6 @@ export function TranslationPanel() {
     setStats(null);
   }, [cancelPendingRequest]);
 
-  // Global Cmd/Ctrl+Enter shortcut to trigger translation
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-        e.preventDefault();
-        void handleTranslate();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => {
-      window.removeEventListener("keydown", handler);
-    };
-  }, [handleTranslate]);
-
   // Debounced auto-translate on text change (500ms).
   // handleTranslate is intentionally omitted — it changes on every sourceText
   // update, which would reset the debounce timer on each keystroke.
