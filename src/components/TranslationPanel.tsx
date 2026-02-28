@@ -46,12 +46,16 @@ export function TranslationPanel() {
         storedTgt && VALID_LANGUAGE_CODES.has(storedTgt) ? storedTgt : DEFAULT_TARGET_RECENTS[0];
       const loadedSourceRecents = loadRecents("srcRecents", [...DEFAULT_SOURCE_RECENTS]);
       const loadedTargetRecents = loadRecents("tgtRecents", [...DEFAULT_TARGET_RECENTS]);
-      // Normalize order so selected language is first; avoids "keep value in recents" effect firing after restore (extra render)
+      // Ensure selected language is present in recents (without reordering if already there)
       const next = {
         sourceLanguage: src,
         targetLanguage: tgt,
-        sourceRecents: addToRecents(loadedSourceRecents, src),
-        targetRecents: addToRecents(loadedTargetRecents, tgt),
+        sourceRecents: loadedSourceRecents.includes(src)
+          ? loadedSourceRecents
+          : addToRecents(loadedSourceRecents, src),
+        targetRecents: loadedTargetRecents.includes(tgt)
+          ? loadedTargetRecents
+          : addToRecents(loadedTargetRecents, tgt),
         hasRestored: true,
       };
       setLanguageState(next);
@@ -77,12 +81,13 @@ export function TranslationPanel() {
   }, []);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Keep value in recents when it changes externally (e.g. swap); skip if already first to avoid reorder flash after restore
+  // Add language to recents only when it's not already present (e.g. swap brings in a new one);
+  // never reorder existing recents — tab row stays stable for the sliding highlight.
   useEffect(() => {
     if (
       !sourceLanguage ||
       !VALID_LANGUAGE_CODES.has(sourceLanguage) ||
-      sourceRecents[0] === sourceLanguage
+      sourceRecents.includes(sourceLanguage)
     )
       return;
     setLanguageState((prev) => {
@@ -95,7 +100,7 @@ export function TranslationPanel() {
     if (
       !targetLanguage ||
       !VALID_LANGUAGE_CODES.has(targetLanguage) ||
-      targetRecents[0] === targetLanguage
+      targetRecents.includes(targetLanguage)
     )
       return;
     setLanguageState((prev) => {
@@ -287,10 +292,15 @@ export function TranslationPanel() {
               <LanguageSelector
                 value={sourceLanguage}
                 onChange={(code) => {
+                  if (code === targetLanguage) {
+                    setTargetLanguage(sourceLanguage);
+                    setLocalStorage("tgtLang", sourceLanguage);
+                    setSourceText(translatedText);
+                    setTranslatedText(sourceText);
+                  }
                   setSourceLanguage(code);
                   setLocalStorage("srcLang", code);
                 }}
-                excludeCode={targetLanguage}
                 recents={sourceRecents}
                 onRecentsChange={(next) => {
                   setSourceRecents(next);
@@ -320,10 +330,15 @@ export function TranslationPanel() {
               <LanguageSelector
                 value={targetLanguage}
                 onChange={(code) => {
+                  if (code === sourceLanguage) {
+                    setSourceLanguage(targetLanguage);
+                    setLocalStorage("srcLang", targetLanguage);
+                    setSourceText(translatedText);
+                    setTranslatedText(sourceText);
+                  }
                   setTargetLanguage(code);
                   setLocalStorage("tgtLang", code);
                 }}
-                excludeCode={sourceLanguage}
                 recents={targetRecents}
                 onRecentsChange={(next) => {
                   setTargetRecents(next);

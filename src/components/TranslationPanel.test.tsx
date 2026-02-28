@@ -199,6 +199,25 @@ describe("TranslationPanel", () => {
     expect(screen.getByText("Translation will appear here")).toBeInTheDocument();
   });
 
+  it("swaps languages when selecting a language matching the other side", async () => {
+    localStorage.setItem("srcLang", "en");
+    localStorage.setItem("tgtLang", "fr_FR");
+
+    const user = userEvent.setup();
+    render(<TranslationPanel />);
+
+    // Select French as source (same as target) — should swap target to English
+    const searchButtons = screen.getAllByRole("button", { name: "Search languages" });
+    const sourceButton = searchButtons[0];
+    if (!sourceButton) throw new Error("Expected source language search button");
+    await user.click(sourceButton);
+    await user.type(screen.getByPlaceholderText("Search languages..."), "French (France)");
+    await user.click(within(screen.getByRole("listbox")).getByText("French (France)"));
+
+    expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+    expect(localStorage.getItem("tgtLang")).toBe("en");
+  });
+
   it("shows character count", async () => {
     const user = userEvent.setup();
     render(<TranslationPanel />);

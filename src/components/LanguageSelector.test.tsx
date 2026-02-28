@@ -74,16 +74,6 @@ describe("LanguageSelector", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("excludes the language specified by excludeCode", async () => {
-    const user = userEvent.setup();
-    render(<LanguageSelector value="en" {...defaultProps} excludeCode="de_DE" />);
-
-    await user.click(screen.getByRole("button", { name: "Search languages" }));
-    await user.type(screen.getByPlaceholderText("Search languages..."), "German");
-
-    expect(screen.getByText("No languages found")).toBeInTheDocument();
-  });
-
   it("marks selected language option with aria-selected", async () => {
     const user = userEvent.setup();
     render(<LanguageSelector value="en" {...defaultProps} />);
@@ -107,7 +97,19 @@ describe("LanguageSelector", () => {
     expect(onChange).toHaveBeenCalledWith("de_DE");
   });
 
-  it("calls onRecentsChange when a language is selected", async () => {
+  it("calls onRecentsChange when a new language is selected", async () => {
+    const onRecentsChange = vi.fn();
+    const user = userEvent.setup();
+    render(<LanguageSelector value="en" {...defaultProps} onRecentsChange={onRecentsChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    await user.type(screen.getByPlaceholderText("Search languages..."), "Japan");
+    await user.click(within(screen.getByRole("listbox")).getByText("Japanese"));
+
+    expect(onRecentsChange).toHaveBeenCalledWith(expect.arrayContaining(["ja_JP"]));
+  });
+
+  it("does not call onRecentsChange when selecting an existing recent", async () => {
     const onRecentsChange = vi.fn();
     const user = userEvent.setup();
     render(<LanguageSelector value="en" {...defaultProps} onRecentsChange={onRecentsChange} />);
@@ -116,7 +118,8 @@ describe("LanguageSelector", () => {
     await user.type(screen.getByPlaceholderText("Search languages..."), "German");
     await user.click(within(screen.getByRole("listbox")).getByText("German"));
 
-    expect(onRecentsChange).toHaveBeenCalledWith(expect.arrayContaining(["de_DE"]));
+    // de_DE is already in DEFAULT_SOURCE_RECENTS, so recents should not change
+    expect(onRecentsChange).not.toHaveBeenCalled();
   });
 
   it("shows 'Select language' when value is empty", () => {

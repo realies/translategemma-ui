@@ -48,7 +48,6 @@ function getDropdownPosition(rect: DOMRect) {
 interface LanguageSelectorProps {
   value: string;
   onChange: (code: string) => void;
-  excludeCode?: string;
   recents: string[];
   onRecentsChange: (next: string[]) => void;
   /** When set, dropdown is positioned/sized to match this element (e.g. textarea panel below). */
@@ -95,7 +94,6 @@ export function addToRecents(recents: string[], code: string): string[] {
 export function LanguageSelector({
   value,
   onChange,
-  excludeCode,
   recents,
   onRecentsChange,
   dropdownAnchorRef,
@@ -105,6 +103,12 @@ export function LanguageSelector({
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
+  const tabContainerRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [highlightStyle, setHighlightStyle] = useState<{
+    left: number;
+    width: number;
+  } | null>(null);
 
   const useAnchor = Boolean(isOpen && dropdownAnchorRef?.current);
 
@@ -126,22 +130,57 @@ export function LanguageSelector({
     };
   }, [useAnchor, dropdownAnchorRef]);
 
-  const visibleTabs = useMemo(
-    () => recents.filter((c) => c !== excludeCode).slice(0, MAX_RECENTS),
-    [recents, excludeCode]
-  );
+  // Measure active tab position for sliding highlight
+  const measureHighlight = useCallback(() => {
+    const container = tabContainerRef.current;
+    const activeTab = tabRefs.current.get(value);
+    if (!container || !activeTab) {
+      setHighlightStyle(null);
+      return;
+    }
+    const containerRect = container.getBoundingClientRect();
+    const tabRect = activeTab.getBoundingClientRect();
+    setHighlightStyle({
+      left: tabRect.left - containerRect.left,
+      width: tabRect.width,
+    });
+  }, [value]);
+
+  useLayoutEffect(() => {
+    measureHighlight();
+  }, [measureHighlight, recents]);
+
+  // Remeasure highlight on resize so it stays aligned
+  useEffect(() => {
+    window.addEventListener("resize", measureHighlight, { passive: true });
+    return () => {
+      window.removeEventListener("resize", measureHighlight);
+    };
+  }, [measureHighlight]);
+
+  const visibleTabs = useMemo(() => recents.slice(0, MAX_RECENTS), [recents]);
+
+  // Track which tabs are newly added (for enter animation)
+  const prevVisibleTabsRef = useRef<string[] | null>(null);
+  const newTabCodes = useMemo(() => {
+    if (prevVisibleTabsRef.current === null) return new Set<string>();
+    const prevSet = new Set(prevVisibleTabsRef.current);
+    return new Set(visibleTabs.filter((code) => !prevSet.has(code)));
+  }, [visibleTabs]);
+
+  useEffect(() => {
+    prevVisibleTabsRef.current = visibleTabs;
+  }, [visibleTabs]);
 
   const filteredLanguages = useMemo(
     () =>
-      languages
-        .filter((lang) => lang.code !== excludeCode)
-        .filter(
-          (lang) =>
-            lang.name.toLowerCase().includes(search.toLowerCase()) ||
-            lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
-            lang.code.toLowerCase().includes(search.toLowerCase())
-        ),
-    [search, excludeCode]
+      languages.filter(
+        (lang) =>
+          lang.name.toLowerCase().includes(search.toLowerCase()) ||
+          lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
+          lang.code.toLowerCase().includes(search.toLowerCase())
+      ),
+    [search]
   );
 
   const close = useCallback(() => {
@@ -153,7 +192,11 @@ export function LanguageSelector({
   const select = useCallback(
     (code: string) => {
       onChange(code);
-      onRecentsChange(addToRecents(recents, code));
+      // Only reorder recents when picking a new language (not already in visible tabs)
+      // so the tab row stays stable for the sliding highlight animation
+      if (!recents.includes(code)) {
+        onRecentsChange(addToRecents(recents, code));
+      }
       close();
     },
     [recents, onChange, onRecentsChange, close]
@@ -205,52 +248,64 @@ export function LanguageSelector({
 
   return (
     <div className="relative w-full min-w-0">
-      <div className="flex min-w-0 items-center gap-1.5">
-        {/* Narrow: active language pill with search icon inside */}
+      {/* Unified pill container — mobile shows only selected language; wide shows recent tabs */}
+      <div
+        className={`flex min-w-0 items-center overflow-hidden rounded-2xl transition-colors ${
+          isOpen ? "bg-zinc-200 dark:bg-zinc-700" : "bg-zinc-100 dark:bg-zinc-800"
+        }`}
+      >
+        {/* Mobile: single selected language */}
         <button
           type="button"
           onClick={() => {
             setIsOpen(true);
           }}
-          className={`flex flex-1 items-center gap-1 rounded-2xl py-2 pr-2.5 pl-3.5 text-left text-[13px] font-medium transition-colors md:hidden ${
-            isOpen
-              ? "bg-zinc-200 text-zinc-800 ring-1 ring-zinc-300 dark:bg-zinc-700 dark:text-zinc-100 dark:ring-zinc-500"
-              : "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200"
-          }`}
+          className="flex min-w-0 flex-1 items-center py-2 pr-1 pl-3.5 text-left text-[13px] font-medium text-zinc-700 md:hidden dark:text-zinc-200"
           aria-label="Select language"
           aria-expanded={isOpen}
         >
           <span className="truncate">{selectedName}</span>
-          <svg
-            className="ml-auto h-3.5 w-3.5 shrink-0 text-zinc-400 dark:text-zinc-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-            />
-          </svg>
         </button>
 
-        {/* Wide: recent language pills — flex-1 pushes search icon to the right; mask fades edges when clipped */}
-        <div className="hidden min-w-0 flex-1 items-center gap-1 overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex">
+        {/* Wide: recent language tabs with sliding highlight */}
+        <div
+          ref={tabContainerRef}
+          className="relative hidden min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex"
+        >
+          {/* Sliding highlight behind active tab */}
+          {highlightStyle && (
+            <div
+              className="absolute top-0 bottom-0 rounded-2xl bg-white/50 transition-[left,width] duration-300 ease-in-out dark:bg-zinc-600/50"
+              style={{
+                left: highlightStyle.left,
+                width: highlightStyle.width,
+              }}
+            />
+          )}
           {visibleTabs.map((code) => {
             const isActive = code === value;
+            const isNew = newTabCodes.has(code);
             return (
               <button
                 key={code}
+                ref={(el) => {
+                  if (el) {
+                    tabRefs.current.set(code, el);
+                  } else {
+                    tabRefs.current.delete(code);
+                  }
+                }}
                 type="button"
                 onClick={() => {
                   select(code);
                 }}
-                className={`rounded-2xl px-3.5 py-1.5 text-[13px] font-medium whitespace-nowrap transition-colors ${
+                onAnimationEnd={isNew ? measureHighlight : undefined}
+                className={`relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors ${
+                  isNew ? "pill-enter" : ""
+                } ${
                   isActive
-                    ? "bg-zinc-100 text-zinc-800 dark:bg-zinc-800 dark:text-zinc-100"
-                    : "text-zinc-500 hover:bg-zinc-100/60 dark:text-zinc-400 dark:hover:bg-zinc-800/60"
+                    ? "text-zinc-800 dark:text-zinc-100"
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
                 }`}
               >
                 {getLanguageName(code)}
@@ -259,16 +314,16 @@ export function LanguageSelector({
           })}
         </div>
 
-        {/* Search icon — desktop only (mobile icon is inside the pill) */}
+        {/* Search icon — always visible, right-aligned inside the pill */}
         <button
           type="button"
           onClick={() => {
             setIsOpen(true);
           }}
           aria-label="Search languages"
-          className="hidden shrink-0 rounded-full p-1.5 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600 md:block dark:hover:bg-zinc-800 dark:hover:text-zinc-300"
+          className="mr-1 shrink-0 rounded-full p-2 text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
