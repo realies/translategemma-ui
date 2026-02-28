@@ -10,12 +10,13 @@ Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technol
 
 ## Features
 
-- **55 languages** — searchable dropdowns with native names
+- **55 languages** — searchable language selector with recent language pills
+- **Auto-translate** — starts translating as you type, no button needed
 - **Local inference** — no data leaves your machine, powered by [Ollama](https://ollama.ai)
-- **Keyboard-first** — `⌘ Enter` / `Ctrl Enter` triggers translation from anywhere on the page; arrow keys navigate language dropdowns
-- **Remembers preferences** — last used language pair is restored on reload
+- **Remembers preferences** — last used language pair and recents restored on reload
 - **Swap languages** — flip source and target with one click
 - **Translation stats** — shows duration and token count after each translation
+- **Rate limiting** — built-in per-IP rate limiter for API requests
 - **Light & dark mode** — follows your system preference
 - **Multi-arch Docker** — native images for `linux/amd64` and `linux/arm64`
 
