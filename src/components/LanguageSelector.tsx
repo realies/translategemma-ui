@@ -162,13 +162,16 @@ export function LanguageSelector({
 
   // Track which tabs are newly added (for enter animation)
   const prevVisibleTabsRef = useRef<string[] | null>(null);
-  const newTabCodes = useMemo(() => {
-    if (prevVisibleTabsRef.current === null) return new Set<string>();
-    const prevSet = new Set(prevVisibleTabsRef.current);
-    return new Set(visibleTabs.filter((code) => !prevSet.has(code)));
-  }, [visibleTabs]);
+  const [newTabCodes, setNewTabCodes] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    if (prevVisibleTabsRef.current !== null) {
+      const prevSet = new Set(prevVisibleTabsRef.current);
+      const added = visibleTabs.filter((code) => !prevSet.has(code));
+      if (added.length > 0) {
+        setNewTabCodes(new Set(added));
+      }
+    }
     prevVisibleTabsRef.current = visibleTabs;
   }, [visibleTabs]);
 
@@ -300,7 +303,14 @@ export function LanguageSelector({
                 onClick={() => {
                   select(code);
                 }}
-                onAnimationEnd={isNew ? measureHighlight : undefined}
+                onAnimationEnd={
+                  isNew
+                    ? () => {
+                        setNewTabCodes(new Set());
+                        measureHighlight();
+                      }
+                    : undefined
+                }
                 className={[
                   "relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
                   isNew ? "pill-enter" : "",
