@@ -273,9 +273,10 @@ export function LanguageSelector({
           className="relative hidden min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex"
         >
           {/* Sliding highlight behind active tab */}
-          {highlightStyle && (
+          {/* Sliding highlight — hidden while active tab is animating in */}
+          {highlightStyle && !newTabCodes.has(value) && (
             <div
-              className="absolute top-0 bottom-0 rounded-2xl bg-white/50 transition-[left,width] duration-300 ease-in-out dark:bg-zinc-600/50"
+              className="absolute top-0 bottom-0 rounded-2xl bg-white/50 transition-[left,width] duration-300 ease-out dark:bg-zinc-600/50"
               style={{
                 left: highlightStyle.left,
                 width: highlightStyle.width,
@@ -300,13 +301,16 @@ export function LanguageSelector({
                   select(code);
                 }}
                 onAnimationEnd={isNew ? measureHighlight : undefined}
-                className={`relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors ${
-                  isNew ? "pill-enter" : ""
-                } ${
+                className={[
+                  "relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                  isNew ? "pill-enter" : "",
                   isActive
                     ? "text-zinc-800 dark:text-zinc-100"
-                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200"
-                }`}
+                    : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
+                  isActive && isNew ? "bg-white/50 dark:bg-zinc-600/50" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 {getLanguageName(code)}
               </button>
