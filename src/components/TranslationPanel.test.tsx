@@ -23,9 +23,30 @@ async function selectTargetLanguage(
   return langCode;
 }
 
+function mockMatchMedia(matches = false) {
+  const listeners: ((e: { matches: boolean }) => void)[] = [];
+  Object.defineProperty(window, "matchMedia", {
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      addEventListener: (_: string, cb: (e: { matches: boolean }) => void) => {
+        listeners.push(cb);
+      },
+      removeEventListener: (_: string, cb: (e: { matches: boolean }) => void) => {
+        const idx = listeners.indexOf(cb);
+        if (idx >= 0) listeners.splice(idx, 1);
+      },
+    })),
+    writable: true,
+  });
+  return listeners;
+}
+
 describe("TranslationPanel", () => {
   beforeEach(() => {
     mockTranslate.mockReset();
+    localStorage.clear();
+    mockMatchMedia(false);
   });
 
   it("renders source and target language search buttons", () => {
@@ -178,6 +199,25 @@ describe("TranslationPanel", () => {
     expect(screen.getByText("Translation will appear here")).toBeInTheDocument();
   });
 
+  it("swaps languages when selecting a language matching the other side", async () => {
+    localStorage.setItem("srcLang", "en");
+    localStorage.setItem("tgtLang", "fr_FR");
+
+    const user = userEvent.setup();
+    render(<TranslationPanel />);
+
+    // Select French as source (same as target) — should swap target to English
+    const searchButtons = screen.getAllByRole("button", { name: "Search languages" });
+    const sourceButton = searchButtons[0];
+    if (!sourceButton) throw new Error("Expected source language search button");
+    await user.click(sourceButton);
+    await user.type(screen.getByPlaceholderText("Search languages..."), "French (France)");
+    await user.click(within(screen.getByRole("listbox")).getByText("French (France)"));
+
+    expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+    expect(localStorage.getItem("tgtLang")).toBe("en");
+  });
+
   it("shows character count", async () => {
     const user = userEvent.setup();
     render(<TranslationPanel />);
@@ -187,5 +227,60 @@ describe("TranslationPanel", () => {
     await user.type(screen.getByPlaceholderText("Enter text to translate..."), "Hello");
 
     expect(screen.getByText("5 chars")).toBeInTheDocument();
+  });
+
+  it("restores languages from localStorage", () => {
+    localStorage.setItem("srcLang", "de_DE");
+    localStorage.setItem("tgtLang", "ja_JP");
+
+    render(<TranslationPanel />);
+
+    // The language pills should show the stored languages
+    expect(screen.getAllByText("German").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Japanese").length).toBeGreaterThan(0);
+  });
+
+  it("ignores invalid language codes in localStorage", () => {
+    localStorage.setItem("srcLang", "not_a_language");
+    localStorage.setItem("tgtLang", "also_invalid");
+
+    render(<TranslationPanel />);
+
+    // Should fall back to defaults (English source, French target)
+    expect(screen.getAllByText("English").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("French (France)").length).toBeGreaterThan(0);
+  });
+
+  it("falls back to defaults when localStorage throws", () => {
+    const getItemSpy = vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("SecurityError");
+    });
+
+    render(<TranslationPanel />);
+
+    // Should render with default languages
+    expect(screen.getAllByText("English").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("French (France)").length).toBeGreaterThan(0);
+
+    getItemSpy.mockRestore();
+  });
+
+  it("swaps source and target languages", async () => {
+    localStorage.setItem("srcLang", "en");
+    localStorage.setItem("tgtLang", "de_DE");
+
+    const user = userEvent.setup();
+    render(<TranslationPanel />);
+
+    // Verify initial state
+    const searchButtons = screen.getAllByRole("button", { name: "Search languages" });
+    expect(searchButtons).toHaveLength(2);
+
+    await user.click(screen.getByTitle("Swap languages"));
+
+    // After swap: source should be German, target should be English
+    // The swap button persists to localStorage — verify via the stored values
+    expect(localStorage.getItem("srcLang")).toBe("de_DE");
+    expect(localStorage.getItem("tgtLang")).toBe("en");
   });
 });

@@ -2,11 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LanguageSelector } from "./LanguageSelector";
+import { DEFAULT_SOURCE_RECENTS } from "./TranslationPanel";
 
 const defaultProps = {
   onChange: vi.fn(),
-  storageKey: "srcRecents",
-  defaultRecents: ["en", "fr_FR", "de_DE", "es_MX"],
+  recents: [...DEFAULT_SOURCE_RECENTS],
+  onRecentsChange: vi.fn(),
 };
 
 describe("LanguageSelector", () => {
@@ -73,16 +74,6 @@ describe("LanguageSelector", () => {
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 
-  it("excludes the language specified by excludeCode", async () => {
-    const user = userEvent.setup();
-    render(<LanguageSelector value="en" {...defaultProps} excludeCode="de_DE" />);
-
-    await user.click(screen.getByRole("button", { name: "Search languages" }));
-    await user.type(screen.getByPlaceholderText("Search languages..."), "German");
-
-    expect(screen.getByText("No languages found")).toBeInTheDocument();
-  });
-
   it("marks selected language option with aria-selected", async () => {
     const user = userEvent.setup();
     render(<LanguageSelector value="en" {...defaultProps} />);
@@ -104,5 +95,46 @@ describe("LanguageSelector", () => {
     await user.keyboard("{Enter}");
 
     expect(onChange).toHaveBeenCalledWith("de_DE");
+  });
+
+  it("calls onRecentsChange when a new language is selected", async () => {
+    const onRecentsChange = vi.fn();
+    const user = userEvent.setup();
+    render(<LanguageSelector value="en" {...defaultProps} onRecentsChange={onRecentsChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    await user.type(screen.getByPlaceholderText("Search languages..."), "Japan");
+    await user.click(within(screen.getByRole("listbox")).getByText("Japanese"));
+
+    expect(onRecentsChange).toHaveBeenCalledWith(expect.arrayContaining(["ja_JP"]));
+  });
+
+  it("does not call onRecentsChange when selecting an existing recent", async () => {
+    const onRecentsChange = vi.fn();
+    const user = userEvent.setup();
+    render(<LanguageSelector value="en" {...defaultProps} onRecentsChange={onRecentsChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    await user.type(screen.getByPlaceholderText("Search languages..."), "German");
+    await user.click(within(screen.getByRole("listbox")).getByText("German"));
+
+    // de_DE is already in DEFAULT_SOURCE_RECENTS, so recents should not change
+    expect(onRecentsChange).not.toHaveBeenCalled();
+  });
+
+  it("shows 'Select language' when value is empty", () => {
+    render(<LanguageSelector value="" {...defaultProps} />);
+    expect(screen.getByText("Select language")).toBeInTheDocument();
+  });
+
+  it("closes dropdown on Escape key", async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector value="en" {...defaultProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
 });
