@@ -5,7 +5,18 @@ updates:
     schedule:
       interval: weekly
     groups:
+      eslint:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
       all-dependencies:
+        exclude-patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "typescript-eslint"
         patterns:
           - "*"
   - package-ecosystem: github-actions
