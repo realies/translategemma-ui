@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { TranslationPanel } from "~/components/TranslationPanel";
+import { LabelProvider } from "~/context/LabelContext";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -11,7 +12,9 @@ export const Route = createFileRoute("/")({
 function HomePage() {
   return (
     <div className="min-h-screen px-5 py-10 dark:bg-zinc-950">
-      <TranslationPanel />
+      <LabelProvider>
+        <TranslationPanel />
+      </LabelProvider>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { RefObject } from "react";
 import { languages, getLanguageName, VALID_LANGUAGE_CODES } from "~/lib/languages";
+import { useLabel } from "~/context/LabelContext";
 
 const MAX_RECENTS = 4;
 
@@ -10,9 +11,11 @@ const MOBILE_ANCHOR_THRESHOLD = 100;
 /** Minimum usable dropdown height before we flip above the anchor. */
 const MIN_DROPDOWN_HEIGHT = 160;
 
-function getDropdownPosition(rect: DOMRect) {
+function getDropdownPosition(rect: DOMRect, endRect?: DOMRect | null) {
   if (rect.height < MOBILE_ANCHOR_THRESHOLD) {
-    const spaceBelow = window.innerHeight - rect.bottom - 16;
+    const dropdownTop = rect.bottom + 8;
+    const bottomBound = endRect ? endRect.bottom : window.innerHeight - 16;
+    const spaceBelow = bottomBound - dropdownTop;
     const spaceAbove = rect.top - 16;
     const maxHeight = Math.min(560, window.innerHeight * 0.7);
 
@@ -30,7 +33,7 @@ function getDropdownPosition(rect: DOMRect) {
 
     return {
       position: "fixed" as const,
-      top: rect.bottom + 8,
+      top: dropdownTop,
       left: rect.left,
       width: rect.width,
       height: Math.max(Math.min(spaceBelow, maxHeight), 0),
@@ -52,6 +55,8 @@ interface LanguageSelectorProps {
   onRecentsChange: (next: string[]) => void;
   /** When set, dropdown is positioned/sized to match this element (e.g. textarea panel below). */
   dropdownAnchorRef?: RefObject<HTMLElement | null>;
+  /** When set, the dropdown bottom edge aligns with this element's bottom (mobile). */
+  dropdownEndRef?: RefObject<HTMLElement | null> | undefined;
 }
 
 export function loadRecents(storageKey: string, defaults: string[]): string[] {
@@ -97,11 +102,18 @@ export function LanguageSelector({
   recents,
   onRecentsChange,
   dropdownAnchorRef,
+  dropdownEndRef,
 }: LanguageSelectorProps) {
+  const defaultSelectLanguage = useLabel("default.selectLanguage");
+  const placeholderSearch = useLabel("placeholder.searchLanguages");
+  const ariaSearch = useLabel("aria.searchLanguages");
+  const noLanguagesFound = useLabel("empty.noLanguages");
+
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const [anchorRect, setAnchorRect] = useState<DOMRect | null>(null);
+  const [endRect, setEndRect] = useState<DOMRect | null>(null);
   const listRef = useRef<HTMLUListElement>(null);
   const tabContainerRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -115,11 +127,14 @@ export function LanguageSelector({
   useLayoutEffect(() => {
     if (!useAnchor || !dropdownAnchorRef?.current) {
       setAnchorRect(null);
+      setEndRect(null);
       return;
     }
     const el = dropdownAnchorRef.current;
+    const endEl = dropdownEndRef?.current;
     const measure = () => {
       setAnchorRect(el.getBoundingClientRect());
+      setEndRect(endEl ? endEl.getBoundingClientRect() : null);
     };
     measure();
     window.addEventListener("scroll", measure, { capture: true, passive: true });
@@ -128,7 +143,7 @@ export function LanguageSelector({
       window.removeEventListener("scroll", measure, { capture: true });
       window.removeEventListener("resize", measure);
     };
-  }, [useAnchor, dropdownAnchorRef]);
+  }, [useAnchor, dropdownAnchorRef, dropdownEndRef]);
 
   // Measure active tab position for sliding highlight
   const measureHighlight = useCallback(() => {
@@ -175,16 +190,26 @@ export function LanguageSelector({
     prevVisibleTabsRef.current = visibleTabs;
   }, [visibleTabs]);
 
-  const filteredLanguages = useMemo(
-    () =>
-      languages.filter(
-        (lang) =>
-          lang.name.toLowerCase().includes(search.toLowerCase()) ||
-          lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
-          lang.code.toLowerCase().includes(search.toLowerCase())
-      ),
-    [search]
-  );
+  const isMobileDropdown = Boolean(anchorRect && anchorRect.height < MOBILE_ANCHOR_THRESHOLD);
+
+  const filteredLanguages = useMemo(() => {
+    const filtered = languages.filter(
+      (lang) =>
+        lang.name.toLowerCase().includes(search.toLowerCase()) ||
+        lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
+        lang.code.toLowerCase().includes(search.toLowerCase())
+    );
+    // On mobile (no pill tabs), float recents to the top when not searching
+    if (isMobileDropdown && !search && recents.length > 0) {
+      const recentSet = new Set(recents);
+      const top = recents
+        .map((code) => filtered.find((l) => l.code === code))
+        .filter(Boolean) as typeof filtered;
+      const rest = filtered.filter((l) => !recentSet.has(l.code));
+      return [...top, ...rest];
+    }
+    return filtered;
+  }, [search, isMobileDropdown, recents]);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -245,15 +270,15 @@ export function LanguageSelector({
     [isOpen, focusedIndex, filteredLanguages, select, close]
   );
 
-  const selectedName = value ? getLanguageName(value) : "Select language";
+  const selectedName = value ? getLanguageName(value) : defaultSelectLanguage;
 
-  const dropdownStyle = anchorRect ? getDropdownPosition(anchorRect) : undefined;
+  const dropdownStyle = anchorRect ? getDropdownPosition(anchorRect, endRect) : undefined;
 
   return (
     <div className="relative w-full min-w-0">
-      {/* Unified pill container — mobile shows only selected language; wide shows recent tabs */}
+      {/* Unified pill container */}
       <div
-        className={`flex min-w-0 items-center overflow-hidden rounded-2xl transition-colors ${
+        className={`flex min-w-0 items-center rounded-2xl shadow-sm transition-colors ${
           isOpen ? "bg-zinc-200 dark:bg-zinc-700" : "bg-zinc-100 dark:bg-zinc-800"
         }`}
       >
@@ -264,7 +289,7 @@ export function LanguageSelector({
             setIsOpen(true);
           }}
           className="flex min-w-0 flex-1 items-center py-2 pr-1 pl-3.5 text-left text-[13px] font-medium text-zinc-700 md:hidden dark:text-zinc-200"
-          aria-label="Select language"
+          aria-label={defaultSelectLanguage}
           aria-expanded={isOpen}
         >
           <span className="truncate">{selectedName}</span>
@@ -275,7 +300,6 @@ export function LanguageSelector({
           ref={tabContainerRef}
           className="relative hidden min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex"
         >
-          {/* Sliding highlight behind active tab */}
           {/* Sliding highlight — hidden while active tab is animating in */}
           {highlightStyle && !newTabCodes.has(value) && (
             <div
@@ -306,13 +330,17 @@ export function LanguageSelector({
                 onAnimationEnd={
                   isNew
                     ? () => {
-                        setNewTabCodes(new Set());
-                        measureHighlight();
+                        // Defer to next frame so the browser paints the animation's
+                        // final state before we swap from inline bg to highlight div
+                        requestAnimationFrame(() => {
+                          setNewTabCodes(new Set());
+                          measureHighlight();
+                        });
                       }
                     : undefined
                 }
                 className={[
-                  "relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-colors",
+                  "relative z-10 rounded-2xl px-3.5 py-2 text-[13px] font-medium whitespace-nowrap transition-[color]",
                   isNew ? "pill-enter" : "",
                   isActive
                     ? "text-zinc-800 dark:text-zinc-100"
@@ -334,7 +362,7 @@ export function LanguageSelector({
           onClick={() => {
             setIsOpen(true);
           }}
-          aria-label="Search languages"
+          aria-label={ariaSearch}
           className="mr-1 shrink-0 rounded-full p-2 text-zinc-400 transition-colors hover:text-zinc-600 dark:text-zinc-500 dark:hover:text-zinc-300"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -361,21 +389,21 @@ export function LanguageSelector({
           <div
             className={
               anchorRect
-                ? "z-20 flex flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
-                : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-2xl bg-white shadow-xl ring-1 ring-zinc-900/5 dark:bg-zinc-800 dark:ring-zinc-100/10"
+                ? "z-20 flex flex-col rounded-2xl bg-white shadow-xl dark:bg-zinc-800"
+                : "absolute top-full left-0 z-20 mt-2 flex w-full min-w-64 flex-col rounded-2xl bg-white shadow-xl dark:bg-zinc-800"
             }
             style={dropdownStyle}
           >
             <div className="shrink-0 p-2.5">
               <input
                 type="text"
-                placeholder="Search languages..."
+                placeholder={placeholderSearch}
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
                 }}
                 onKeyDown={handleKeyDown}
-                aria-label="Search languages"
+                aria-label={ariaSearch}
                 className="w-full rounded-xl bg-zinc-100/80 px-3.5 py-2 text-[13px] focus:outline-none dark:bg-zinc-700/80"
                 autoFocus
               />
@@ -409,7 +437,7 @@ export function LanguageSelector({
                 </li>
               ))}
               {filteredLanguages.length === 0 && (
-                <li className="px-3 py-2 text-[13px] text-zinc-400">No languages found</li>
+                <li className="px-3 py-2 text-[13px] text-zinc-400">{noLanguagesFound}</li>
               )}
             </ul>
           </div>
