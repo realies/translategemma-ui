@@ -36,6 +36,16 @@ describe("detectTargetLocale", () => {
     expect(result).toMatch(/^fr_/);
   });
 
+  it("resolves zh-Hant-TW to zh_TW (skips script subtag)", () => {
+    mockNavigatorLanguage("zh-Hant-TW");
+    expect(detectTargetLocale()).toBe("zh_TW");
+  });
+
+  it("resolves zh-Hans-CN to zh_CN (skips script subtag)", () => {
+    mockNavigatorLanguage("zh-Hans-CN");
+    expect(detectTargetLocale()).toBe("zh_CN");
+  });
+
   it("returns null for unsupported locale", () => {
     mockNavigatorLanguage("xx-YY");
     expect(detectTargetLocale()).toBeNull();

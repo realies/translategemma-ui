@@ -6,7 +6,8 @@ import { VALID_LANGUAGE_CODES } from "./languages";
  *
  * Matching strategy (in order):
  * 1. Exact match: "fr-FR" -> "fr_FR"
- * 2. Language prefix match: "fr" -> first code starting with "fr_"
+ * 2. Language + region: "zh-Hant-TW" -> "zh_TW" (skip script subtag)
+ * 3. Language prefix match: "fr" -> first code starting with "fr_"
  */
 export function detectTargetLocale(): string | null {
   if (typeof navigator === "undefined") return null;
@@ -20,11 +21,20 @@ export function detectTargetLocale(): string | null {
 
   if (VALID_LANGUAGE_CODES.has(underscored)) return underscored;
 
-  const langPrefix = underscored.split("_")[0];
-  if (langPrefix) {
-    for (const code of VALID_LANGUAGE_CODES) {
-      if (code.startsWith(langPrefix + "_")) return code;
+  const [lang, ...rest] = underscored.split("_");
+  if (!lang) return null;
+
+  // For multi-subtag locales (e.g. zh_Hant_TW), try language + last subtag as region
+  if (rest.length >= 2) {
+    const region = rest[rest.length - 1];
+    if (region) {
+      const langRegion = `${lang}_${region}`;
+      if (VALID_LANGUAGE_CODES.has(langRegion)) return langRegion;
     }
+  }
+
+  for (const code of VALID_LANGUAGE_CODES) {
+    if (code.startsWith(lang + "_")) return code;
   }
 
   return null;

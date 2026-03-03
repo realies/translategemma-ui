@@ -164,10 +164,10 @@ async function main() {
     console.log(`Saved: ${outputGif} (${outW}x${outH})`);
   } catch (err) {
     console.error("ffmpeg failed:", err.message);
+    process.exit(1);
+  } finally {
+    rmSync(frameDir, { recursive: true, force: true });
   }
-
-  // Clean up temp frames
-  rmSync(frameDir, { recursive: true, force: true });
 }
 
 main().catch((err) => {
