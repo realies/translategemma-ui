@@ -10,14 +10,14 @@ describe("detectTargetLocale", () => {
     vi.unstubAllGlobals();
   });
 
-  it("returns null for English locale", () => {
+  it("returns en for English locale", () => {
     mockNavigatorLanguage("en");
-    expect(detectTargetLocale()).toBeNull();
+    expect(detectTargetLocale()).toBe("en");
   });
 
-  it("returns null for English with region", () => {
+  it("returns en for English with region", () => {
     mockNavigatorLanguage("en-US");
-    expect(detectTargetLocale()).toBeNull();
+    expect(detectTargetLocale()).toBe("en");
   });
 
   it("returns exact match for fr-FR", () => {
