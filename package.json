@@ -16,6 +16,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
+    "record-demo": "node scripts/record-demo.mjs",
     "prepare": "husky"
   },
   "dependencies": {
@@ -29,6 +30,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/vite": "4.2.1",
     "@tanstack/router-cli": "^1.163.3",
     "@testing-library/jest-dom": "^6.9.1",

@@ -26,33 +26,18 @@ body {
   @apply bg-zinc-400/80 dark:bg-zinc-500/80;
 }
 
-/* Fade-in for language row after restore */
-@keyframes fade-in {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.fade-in {
-  animation: fade-in 0.35s ease-out forwards;
-}
-
 /* Pill enter — new tab grows from 0 width */
 @keyframes pill-enter {
   from {
     max-width: 0;
     padding-left: 0;
     padding-right: 0;
-    opacity: 0;
+    color: transparent;
   }
   to {
     max-width: 12rem;
     padding-left: 0.875rem;
     padding-right: 0.875rem;
-    opacity: 1;
   }
 }
 

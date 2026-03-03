@@ -6,7 +6,7 @@
 
 Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technology/developers-tools/translategemma/), Google's open translation model.
 
-![TranslateGemma UI](https://github.com/user-attachments/assets/2b8fa87a-a251-4725-a48e-d0a500174871)
+![TranslateGemma UI](demo.gif)
 
 ## Features
 
@@ -17,6 +17,7 @@ Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technol
 - **Swap languages** — flip source and target with one click
 - **Translation stats** — shows duration and token count after each translation
 - **Rate limiting** — built-in per-IP rate limiter for API requests
+- **Localized UI** — interface labels adapt to your browser's language
 - **Light & dark mode** — follows your system preference
 - **Multi-arch Docker** — native images for `linux/amd64` and `linux/arm64`
 
