@@ -366,7 +366,7 @@ export function TranslationPanel() {
             placeholder={placeholderSource}
             className="min-h-48 w-full resize-none overflow-hidden bg-transparent p-5 text-lg focus:outline-none"
           />
-          <div className="flex h-10 items-center justify-end gap-3 px-4">
+          <div className="mt-auto flex h-10 items-center justify-end gap-3 px-4">
             <button
               type="button"
               onClick={handleClear}
