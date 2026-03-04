@@ -182,7 +182,14 @@ export function TranslationPanel() {
   // startTranslation/sourceLanguage/targetLanguage are intentionally omitted —
   // including them would reset the debounce timer on each keystroke.
   useEffect(() => {
-    if (!sourceText.trim() || !targetLanguage) return;
+    if (!sourceText.trim() || !targetLanguage) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abort();
+      setTranslatedText("");
+      setError(null);
+      setStats(null);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       startTranslation(sourceText, sourceLanguage, targetLanguage);

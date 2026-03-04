@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { translateStream } from "~/serverFunctions/translateStream";
 
 interface OllamaStreamLine {
@@ -157,6 +157,8 @@ export function useStreamingTranslation() {
     },
     [abort]
   );
+
+  useEffect(() => abort, [abort]);
 
   return {
     translatedText,

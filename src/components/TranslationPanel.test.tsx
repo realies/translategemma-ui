@@ -22,6 +22,28 @@ function mockStreamResponse(
   });
 }
 
+/** Build a Response with multiple chunks to exercise incremental NDJSON parsing. */
+function mockChunkedStreamResponse(
+  tokens: string[],
+  stats?: { total_duration?: number; eval_count?: number; eval_duration?: number }
+) {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream({
+    start(controller) {
+      for (const token of tokens) {
+        controller.enqueue(encoder.encode(JSON.stringify({ response: token, done: false }) + "\n"));
+      }
+      controller.enqueue(
+        encoder.encode(JSON.stringify({ response: "", done: true, ...stats }) + "\n")
+      );
+      controller.close();
+    },
+  });
+  return new Response(stream, {
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
+}
+
 // Helper: select a target language via the second "Search languages" button
 async function selectTargetLanguage(
   user: ReturnType<typeof userEvent.setup>,
@@ -309,5 +331,30 @@ describe("TranslationPanel", () => {
     // The swap button persists to localStorage — verify via the stored values
     expect(localStorage.getItem("srcLang")).toBe("de_DE");
     expect(localStorage.getItem("tgtLang")).toBe("en");
+  });
+
+  it("handles chunked NDJSON stream with multiple tokens", async () => {
+    mockTranslateStream.mockResolvedValue(
+      mockChunkedStreamResponse(["Hal", "lo ", "Welt"], {
+        total_duration: 4000000000,
+        eval_count: 3,
+      })
+    );
+
+    const user = userEvent.setup();
+    render(<TranslationPanel />);
+
+    await selectTargetLanguage(user, "German", "de_DE");
+    await user.type(screen.getByPlaceholderText("Enter text to translate..."), "Hello World");
+
+    await waitFor(
+      () => {
+        expect(screen.getByText("Hallo Welt")).toBeInTheDocument();
+      },
+      { timeout: 3000 }
+    );
+
+    expect(screen.getByText(/4s/)).toBeInTheDocument();
+    expect(screen.getByText(/3 tokens/)).toBeInTheDocument();
   });
 });
