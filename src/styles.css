@@ -45,19 +45,3 @@ body {
   animation: pill-enter 0.3s ease-out forwards;
   overflow: hidden;
 }
-
-/* Streaming animation */
-@keyframes pulse-opacity {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.streaming-cursor::after {
-  content: "▋";
-  animation: pulse-opacity 1s ease-in-out infinite;
-}

@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import { LanguageSelector, loadRecents, addToRecents, saveRecents } from "./LanguageSelector";
-import { translate } from "~/serverFunctions/translate";
+import { useStreamingTranslation } from "~/hooks/useStreamingTranslation";
 import { VALID_LANGUAGE_CODES } from "~/lib/languages";
 import { useLabel } from "~/context/LabelContext";
 
@@ -20,15 +20,24 @@ export function TranslationPanel() {
   const placeholderSource = useLabel("placeholder.source");
   const titleSwap = useLabel("title.swap");
   const titleClear = useLabel("title.clear");
-  const statusTranslating = useLabel("status.translating");
   const emptyTranslation = useLabel("empty.translation");
   const labelChars = useLabel("label.chars");
   const titleCopy = useLabel("title.copy");
   const titleCopied = useLabel("title.copied");
 
+  const {
+    translatedText,
+    setTranslatedText,
+    error,
+    setError,
+    stats,
+    setStats,
+    startTranslation,
+    abort,
+  } = useStreamingTranslation();
+
   const [hydrated, setHydrated] = useState(false);
   const [sourceText, setSourceText] = useState("");
-  const [translatedText, setTranslatedText] = useState("");
 
   const [languageState, setLanguageState] = useState<{
     sourceLanguage: string;
@@ -85,8 +94,6 @@ export function TranslationPanel() {
   const setTargetRecents = useCallback((next: string[]) => {
     setLanguageState((prev) => ({ ...prev, targetRecents: next }));
   }, []);
-  const [isLoading, setIsLoading] = useState(false);
-
   // Add language to recents only when it's not already present (e.g. swap brings in a new one);
   // never reorder existing recents — tab row stays stable for the sliding highlight.
   useEffect(() => {
@@ -116,12 +123,6 @@ export function TranslationPanel() {
     });
   }, [targetLanguage, targetRecents]);
 
-  const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<{
-    duration?: number;
-    tokens?: number;
-  } | null>(null);
-
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const sourcePanelRef = useRef<HTMLDivElement>(null);
@@ -142,68 +143,13 @@ export function TranslationPanel() {
     };
   }, []);
 
-  // Track request ID to ignore stale responses
-  const requestIdRef = useRef(0);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const cancelPendingRequest = useCallback(() => {
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    requestIdRef.current += 1;
-    setIsLoading(false);
-  }, []);
-
-  const handleTranslate = useCallback(async () => {
-    if (!sourceText.trim() || !targetLanguage) return;
-
-    // Cancel any pending debounce and start a new request
-    if (debounceRef.current) clearTimeout(debounceRef.current);
-    requestIdRef.current += 1;
-    const currentRequestId = requestIdRef.current;
-
-    setIsLoading(true);
-    setError(null);
-    setTranslatedText("");
-    setStats(null);
-
-    try {
-      const result = await translate({
-        data: {
-          text: sourceText,
-          sourceLanguage,
-          targetLanguage,
-        },
-      });
-
-      // Ignore result if a newer request was started or request was cancelled
-      if (requestIdRef.current !== currentRequestId) return;
-
-      setTranslatedText(result.translation);
-
-      if (result.stats.totalDuration) {
-        const newStats: { duration: number; tokens?: number } = {
-          duration: Math.round(result.stats.totalDuration / 1_000_000_000),
-        };
-        if (result.stats.evalCount !== undefined) {
-          newStats.tokens = result.stats.evalCount;
-        }
-        setStats(newStats);
-      }
-    } catch (err) {
-      // Ignore errors from stale requests
-      if (requestIdRef.current !== currentRequestId) return;
-      setError(err instanceof Error ? err.message : "Translation failed");
-    } finally {
-      // Only update loading state if this is still the current request
-      if (requestIdRef.current === currentRequestId) {
-        setIsLoading(false);
-      }
-    }
-  }, [sourceText, sourceLanguage, targetLanguage]);
-
   const handleSwapLanguages = useCallback(() => {
     if (!targetLanguage) return;
-    cancelPendingRequest();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    abort();
     setSourceLanguage(targetLanguage);
     setTargetLanguage(sourceLanguage);
     setLocalStorage("srcLang", targetLanguage);
@@ -212,24 +158,41 @@ export function TranslationPanel() {
     setTranslatedText(sourceText);
     setError(null);
     setStats(null);
-  }, [sourceLanguage, targetLanguage, sourceText, translatedText, cancelPendingRequest]);
+  }, [
+    sourceLanguage,
+    targetLanguage,
+    sourceText,
+    translatedText,
+    abort,
+    setTranslatedText,
+    setError,
+    setStats,
+  ]);
 
   const handleClear = useCallback(() => {
-    cancelPendingRequest();
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    abort();
     setSourceText("");
     setTranslatedText("");
     setError(null);
     setStats(null);
-  }, [cancelPendingRequest]);
+  }, [abort, setTranslatedText, setError, setStats]);
 
   // Debounced auto-translate on text change (500ms).
-  // handleTranslate is intentionally omitted — it changes on every sourceText
-  // update, which would reset the debounce timer on each keystroke.
+  // startTranslation/sourceLanguage/targetLanguage are intentionally omitted —
+  // including them would reset the debounce timer on each keystroke.
   useEffect(() => {
-    if (!sourceText.trim() || !targetLanguage) return;
+    if (!sourceText.trim() || !targetLanguage) {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      abort();
+      setTranslatedText("");
+      setError(null);
+      setStats(null);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      void handleTranslate();
+      startTranslation(sourceText, sourceLanguage, targetLanguage);
     }, 500);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -237,12 +200,12 @@ export function TranslationPanel() {
   }, [sourceText]);
 
   // Immediate auto-translate on language change (if text exists).
-  // handleTranslate and sourceText are intentionally omitted — including them
+  // startTranslation and sourceText are intentionally omitted — including them
   // would duplicate the debounced effect above on every keystroke.
   useEffect(() => {
     if (!sourceText.trim() || !targetLanguage) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    void handleTranslate();
+    startTranslation(sourceText, sourceLanguage, targetLanguage);
   }, [sourceLanguage, targetLanguage]);
 
   // Auto-resize textarea height based on content
@@ -286,7 +249,8 @@ export function TranslationPanel() {
             value={sourceLanguage}
             onChange={(code) => {
               if (code === targetLanguage) {
-                cancelPendingRequest();
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                abort();
                 setError(null);
                 setStats(null);
                 setTargetLanguage(sourceLanguage);
@@ -328,7 +292,8 @@ export function TranslationPanel() {
             value={targetLanguage}
             onChange={(code) => {
               if (code === sourceLanguage) {
-                cancelPendingRequest();
+                if (debounceRef.current) clearTimeout(debounceRef.current);
+                abort();
                 setError(null);
                 setStats(null);
                 setSourceLanguage(targetLanguage);
@@ -393,17 +358,11 @@ export function TranslationPanel() {
           ref={targetPanelRef}
           className="flex flex-col rounded-2xl bg-zinc-50 shadow-sm dark:bg-zinc-900"
         >
-          <div
-            className={`min-h-48 flex-1 p-5 text-lg whitespace-pre-wrap ${
-              isLoading ? "streaming-cursor" : ""
-            }`}
-          >
+          <div className="min-h-48 flex-1 p-5 text-lg whitespace-pre-wrap">
             {error ? (
               <span className="text-red-500">{error}</span>
             ) : translatedText ? (
               translatedText
-            ) : isLoading ? (
-              <span className="text-zinc-400">{statusTranslating}</span>
             ) : (
               <span className="text-zinc-300 dark:text-zinc-600">{emptyTranslation}</span>
             )}
