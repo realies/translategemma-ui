@@ -15,6 +15,13 @@ interface Stats {
   tokens?: number;
 }
 
+function parseFinalStats(parsed: OllamaStreamLine): Stats | null {
+  if (parsed.total_duration === undefined) return null;
+  const stats: Stats = { duration: Math.round(parsed.total_duration / 1_000_000_000) };
+  if (parsed.eval_count !== undefined) stats.tokens = parsed.eval_count;
+  return stats;
+}
+
 export function useStreamingTranslation() {
   const [translatedText, setTranslatedText] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -98,16 +105,8 @@ export function useStreamingTranslation() {
               }
 
               if (parsed.done) {
-                // Extract stats from the final line
-                if (parsed.total_duration) {
-                  const newStats: Stats = {
-                    duration: Math.round(parsed.total_duration / 1_000_000_000),
-                  };
-                  if (parsed.eval_count !== undefined) {
-                    newStats.tokens = parsed.eval_count;
-                  }
-                  setStats(newStats);
-                }
+                const finalStats = parseFinalStats(parsed);
+                if (finalStats) setStats(finalStats);
               }
             }
 
@@ -125,14 +124,9 @@ export function useStreamingTranslation() {
               if (parsed.response) {
                 accumulated += parsed.response;
               }
-              if (parsed.done && parsed.total_duration) {
-                const newStats: Stats = {
-                  duration: Math.round(parsed.total_duration / 1_000_000_000),
-                };
-                if (parsed.eval_count !== undefined) {
-                  newStats.tokens = parsed.eval_count;
-                }
-                setStats(newStats);
+              if (parsed.done) {
+                const finalStats = parseFinalStats(parsed);
+                if (finalStats) setStats(finalStats);
               }
             } catch {
               // Ignore malformed trailing data
