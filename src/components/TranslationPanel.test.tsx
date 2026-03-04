@@ -1,12 +1,26 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { TranslationPanel } from "./TranslationPanel";
 
-const mockTranslate = vi.fn();
-vi.mock("~/serverFunctions/translate", () => ({
-  translate: (...args: unknown[]) => mockTranslate(...args) as unknown,
+const mockTranslateStream = vi.fn();
+vi.mock("~/serverFunctions/translateStream", () => ({
+  translateStream: (...args: unknown[]) => mockTranslateStream(...args) as unknown,
 }));
+
+/** Build a Response whose body is an NDJSON stream Ollama-style. */
+function mockStreamResponse(
+  translation: string,
+  stats?: { total_duration?: number; eval_count?: number; eval_duration?: number }
+) {
+  const lines = [
+    JSON.stringify({ response: translation, done: false }),
+    JSON.stringify({ response: "", done: true, ...stats }),
+  ];
+  return new Response(lines.join("\n") + "\n", {
+    headers: { "Content-Type": "application/x-ndjson" },
+  });
+}
 
 // Helper: select a target language via the second "Search languages" button
 async function selectTargetLanguage(
@@ -44,9 +58,20 @@ function mockMatchMedia(matches = false) {
 
 describe("TranslationPanel", () => {
   beforeEach(() => {
-    mockTranslate.mockReset();
+    mockTranslateStream.mockReset();
     localStorage.clear();
     mockMatchMedia(false);
+    // requestAnimationFrame isn't available in jsdom
+    vi.stubGlobal("requestAnimationFrame", (cb: () => void) => {
+      return setTimeout(cb, 0);
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => {
+      clearTimeout(id);
+    });
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("renders source and target language search buttons", () => {
@@ -66,11 +91,13 @@ describe("TranslationPanel", () => {
   });
 
   it("calls translate after typing text with target language set", async () => {
-    mockTranslate.mockResolvedValue({
-      translation: "Hallo Welt",
-      model: "translategemma:27b",
-      stats: { totalDuration: 5000000000, evalCount: 10, evalDuration: 3000000000 },
-    });
+    mockTranslateStream.mockResolvedValue(
+      mockStreamResponse("Hallo Welt", {
+        total_duration: 5000000000,
+        eval_count: 10,
+        eval_duration: 3000000000,
+      })
+    );
 
     const user = userEvent.setup();
     render(<TranslationPanel />);
@@ -85,13 +112,15 @@ describe("TranslationPanel", () => {
       { timeout: 3000 }
     );
 
-    expect(mockTranslate).toHaveBeenCalledWith({
-      data: { text: "Hello World", sourceLanguage: "en", targetLanguage: "de_DE" },
-    });
+    expect(mockTranslateStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: { text: "Hello World", sourceLanguage: "en", targetLanguage: "de_DE" },
+      })
+    );
   });
 
   it("displays error on translation failure", async () => {
-    mockTranslate.mockRejectedValue(new Error("Connection failed"));
+    mockTranslateStream.mockRejectedValue(new Error("Connection failed"));
 
     const user = userEvent.setup();
     render(<TranslationPanel />);
@@ -108,7 +137,7 @@ describe("TranslationPanel", () => {
   });
 
   it("displays 'Translation failed' for non-Error throws", async () => {
-    mockTranslate.mockRejectedValue("some string error");
+    mockTranslateStream.mockRejectedValue("some string error");
 
     const user = userEvent.setup();
     render(<TranslationPanel />);
@@ -125,11 +154,13 @@ describe("TranslationPanel", () => {
   });
 
   it("shows stats after successful translation", async () => {
-    mockTranslate.mockResolvedValue({
-      translation: "Hallo",
-      model: "translategemma:27b",
-      stats: { totalDuration: 2000000000, evalCount: 5, evalDuration: 1000000000 },
-    });
+    mockTranslateStream.mockResolvedValue(
+      mockStreamResponse("Hallo", {
+        total_duration: 2000000000,
+        eval_count: 5,
+        eval_duration: 1000000000,
+      })
+    );
 
     const user = userEvent.setup();
     render(<TranslationPanel />);
@@ -149,11 +180,9 @@ describe("TranslationPanel", () => {
   });
 
   it("handles stats with undefined tokens", async () => {
-    mockTranslate.mockResolvedValue({
-      translation: "Hallo",
-      model: "translategemma:27b",
-      stats: { totalDuration: 3000000000 },
-    });
+    mockTranslateStream.mockResolvedValue(
+      mockStreamResponse("Hallo", { total_duration: 3000000000 })
+    );
 
     const user = userEvent.setup();
     render(<TranslationPanel />);
@@ -173,11 +202,9 @@ describe("TranslationPanel", () => {
   });
 
   it("clears text and translation when clear button is clicked", async () => {
-    mockTranslate.mockResolvedValue({
-      translation: "Hallo",
-      model: "translategemma:27b",
-      stats: { totalDuration: 1000000000 },
-    });
+    mockTranslateStream.mockResolvedValue(
+      mockStreamResponse("Hallo", { total_duration: 1000000000 })
+    );
 
     const user = userEvent.setup();
     render(<TranslationPanel />);
