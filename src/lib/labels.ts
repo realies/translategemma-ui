@@ -3,7 +3,6 @@ export const DEFAULT_LABELS = {
   "placeholder.source": "Enter text to translate...",
   "title.swap": "Swap languages",
   "title.clear": "Clear",
-  "status.translating": "Translating...",
   "empty.translation": "Translation will appear here",
   "label.chars": "chars",
   "title.copy": "Copy to clipboard",
