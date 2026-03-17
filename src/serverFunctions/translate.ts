@@ -1,35 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { buildTranslationPrompt } from "~/lib/prompt";
-
-type LlmProvider = "ollama" | "openai";
-
-const LLM_PROVIDER: LlmProvider =
-  process.env["LLM_PROVIDER"]?.toLowerCase() === "ollama" ? "ollama" : "openai";
-const OLLAMA_URL = (process.env["OLLAMA_URL"] ?? "http://localhost:11434").replace(/\/+$/, "");
-const OPENAI_BASE_URL = (process.env["OPENAI_BASE_URL"] ??
-  process.env["OLLAMA_URL"] ??
-  "http://localhost:11434"
-).replace(/\/+$/, "");
-const OPENAI_CHAT_COMPLETION_PATH = process.env["OPENAI_CHAT_COMPLETION_PATH"];
-const OPENAI_API_KEY = process.env["OPENAI_API_KEY"];
-const DEFAULT_MODEL = process.env["DEFAULT_MODEL"] ?? "translategemma:27b";
-
-function buildOpenAIChatCompletionUrls(baseUrl: string): string[] {
-  if (OPENAI_CHAT_COMPLETION_PATH && OPENAI_CHAT_COMPLETION_PATH.trim()) {
-    const customPath = OPENAI_CHAT_COMPLETION_PATH.startsWith("/")
-      ? OPENAI_CHAT_COMPLETION_PATH
-      : `/${OPENAI_CHAT_COMPLETION_PATH}`;
-    return [`${baseUrl}${customPath}`];
-  }
-
-  const normalizedBaseUrl = baseUrl.toLowerCase();
-  const defaults =
-    normalizedBaseUrl.endsWith("/api") || normalizedBaseUrl.endsWith("/v1")
-      ? ["/chat/completions", "/v1/chat/completions"]
-      : ["/v1/chat/completions", "/api/v1/chat/completions", "/api/chat/completions", "/chat/completions"];
-
-  return [...new Set(defaults.map((path) => `${baseUrl}${path}`))];
-}
+import { DEFAULT_MODEL, fetchOpenAIChatCompletion, LLM_PROVIDER, OLLAMA_URL } from "./llmProvider";
 
 interface TranslateInput {
   text: string;
@@ -166,8 +137,6 @@ export const translate = createServerFn({ method: "POST" })
       };
     }
 
-    const chatCompletionUrls = buildOpenAIChatCompletionUrls(OPENAI_BASE_URL);
-
     const requestBody: OpenAIChatCompletionRequest = {
       model,
       messages: [{ role: "user", content: prompt }],
@@ -176,37 +145,14 @@ export const translate = createServerFn({ method: "POST" })
       max_tokens: 4096,
     };
 
-    let response: Response | null = null;
-    let routingError: string | null = null;
+    let response: Response;
     try {
-      for (const url of chatCompletionUrls) {
-        const attempted = await fetch(url, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(OPENAI_API_KEY ? { Authorization: `Bearer ${OPENAI_API_KEY}` } : {}),
-          },
-          body: JSON.stringify(requestBody),
-          signal: controller.signal,
-        });
-
-        if ((attempted.status === 404 || attempted.status === 405) && chatCompletionUrls.length > 1) {
-          const errorText = await attempted.text();
-          routingError = `${url} -> ${String(attempted.status)} - ${errorText}`;
-          continue;
-        }
-
-        response = attempted;
-        break;
-      }
+      response = await fetchOpenAIChatCompletion({
+        body: requestBody,
+        signal: controller.signal,
+      });
     } finally {
       clearTimeout(timeoutId);
-    }
-
-    if (!response) {
-      throw new Error(
-        `OpenAI API error: no compatible chat completions endpoint found under ${OPENAI_BASE_URL}${routingError ? ` (${routingError})` : ""}`
-      );
     }
 
     if (!response.ok) {
