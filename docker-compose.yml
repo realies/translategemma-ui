@@ -13,6 +13,12 @@ services:
       - OPENAI_BASE_URL=http://host.docker.internal:8080/api
       - OPENAI_API_KEY=
       - DEFAULT_MODEL=translategemma:27b
+      - OIDC_ENABLED=false
+      - OIDC_ISSUER_URL=
+      - OIDC_CLIENT_ID=
+      - OIDC_REDIRECT_URI=
+      - OIDC_SCOPES=openid profile email
+      - OIDC_POST_LOGOUT_REDIRECT_URI=
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
