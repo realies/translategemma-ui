@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 // Capture the validator and handler from createServerFn chain
-let capturedValidator: (data: unknown) => unknown;
-let capturedHandler: (ctx: { data: unknown }) => Promise<unknown>;
+let capturedValidator!: (data: unknown) => unknown;
+let capturedHandler!: (ctx: { data: unknown }) => Promise<unknown>;
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({
@@ -18,10 +18,29 @@ vi.mock("@tanstack/react-start", () => ({
   }),
 }));
 
-// Import after mock setup so the module executes with our mock
-await import("./translateStream");
+const TEST_BASE_URL = "http://localhost:11434";
+
+function setProviderEnv(provider: "ollama" | "openai"): void {
+  process.env["LLM_PROVIDER"] = provider;
+  process.env["OLLAMA_URL"] = TEST_BASE_URL;
+  delete process.env["OPENAI_BASE_URL"];
+  delete process.env["OPENAI_CHAT_COMPLETION_PATH"];
+  delete process.env["OPENAI_API_KEY"];
+  delete process.env["DEFAULT_MODEL"];
+}
+
+async function loadTranslateStreamModule(provider: "ollama" | "openai"): Promise<void> {
+  vi.resetModules();
+  setProviderEnv(provider);
+  await import("./translateStream");
+}
 
 describe("translateStream input validator", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await loadTranslateStreamModule("ollama");
+  });
+
   it("accepts valid input", () => {
     const result = capturedValidator({
       text: "Hello",
@@ -101,8 +120,91 @@ describe("translateStream input validator", () => {
 });
 
 describe("translateStream handler", () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.restoreAllMocks();
+    await loadTranslateStreamModule("ollama");
+  });
+
+  it("calls Ollama API with stream: true and returns a Response", async () => {
+    const ndjsonBody = '{"response":"Hallo","done":false}\n{"response":"","done":true}\n';
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.enqueue(new TextEncoder().encode(ndjsonBody));
+            controller.close();
+          },
+        }),
+      })
+    );
+
+    const result = (await capturedHandler({
+      data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+    })) as Response;
+
+    expect(result).toBeInstanceOf(Response);
+    expect(result.headers.get("Content-Type")).toBe("application/x-ndjson");
+
+    const [url, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${TEST_BASE_URL}/api/generate`);
+    const body = JSON.parse(options.body as string) as Record<string, unknown>;
+    expect(body["stream"]).toBe(true);
+    expect(body["model"]).toBe("translategemma:27b");
+  });
+
+  it("throws on non-200 API response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal Server Error"),
+      })
+    );
+
+    await expect(
+      capturedHandler({
+        data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+      })
+    ).rejects.toThrow("Ollama API error: 500 - Internal Server Error");
+  });
+
+  it("uses custom model when provided", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        body: new ReadableStream({
+          start(controller) {
+            controller.close();
+          },
+        }),
+      })
+    );
+
+    await capturedHandler({
+      data: {
+        text: "Hello",
+        sourceLanguage: "en",
+        targetLanguage: "de_DE",
+        model: "custom-model",
+      },
+    });
+
+    const body = JSON.parse(
+      ((fetch as Mock).mock.calls[0] as [string, RequestInit])[1].body as string
+    ) as Record<string, unknown>;
+    expect(body["model"]).toBe("custom-model");
+  });
+});
+
+describe("translateStream handler (openai)", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await loadTranslateStreamModule("openai");
   });
 
   it("calls OpenAI-compatible API with stream: true and returns NDJSON", async () => {
@@ -144,11 +246,11 @@ describe("translateStream handler", () => {
 
     // Verify fetch was called with stream: true
     const [url, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:11434/v1/chat/completions");
+    expect(url).toBe(`${TEST_BASE_URL}/v1/chat/completions`);
     const body = JSON.parse(options.body as string) as Record<string, unknown>;
     expect(body["stream"]).toBe(true);
     expect(body["model"]).toBe("translategemma:27b");
-    const messages = body["messages"] as Array<Record<string, unknown>>;
+    const messages = body["messages"] as Record<string, unknown>[];
     expect(messages[0]?.["role"]).toBe("user");
   });
 
@@ -200,10 +302,10 @@ describe("translateStream handler", () => {
 
     expect((fetch as Mock).mock.calls).toHaveLength(2);
     expect(((fetch as Mock).mock.calls[0] as [string])[0]).toBe(
-      "http://localhost:11434/v1/chat/completions"
+      `${TEST_BASE_URL}/v1/chat/completions`
     );
     expect(((fetch as Mock).mock.calls[1] as [string])[0]).toBe(
-      "http://localhost:11434/api/v1/chat/completions"
+      `${TEST_BASE_URL}/api/v1/chat/completions`
     );
 
     expect(result).toBeInstanceOf(Response);

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 // Capture the validator and handler from createServerFn chain
-let capturedValidator: (data: unknown) => unknown;
-let capturedHandler: (ctx: { data: unknown }) => Promise<unknown>;
+let capturedValidator!: (data: unknown) => unknown;
+let capturedHandler!: (ctx: { data: unknown }) => Promise<unknown>;
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({
@@ -18,10 +18,29 @@ vi.mock("@tanstack/react-start", () => ({
   }),
 }));
 
-// Import after mock setup so the module executes with our mock
-await import("./translate");
+const TEST_BASE_URL = "http://localhost:11434";
+
+function setProviderEnv(provider: "ollama" | "openai"): void {
+  process.env["LLM_PROVIDER"] = provider;
+  process.env["OLLAMA_URL"] = TEST_BASE_URL;
+  delete process.env["OPENAI_BASE_URL"];
+  delete process.env["OPENAI_CHAT_COMPLETION_PATH"];
+  delete process.env["OPENAI_API_KEY"];
+  delete process.env["DEFAULT_MODEL"];
+}
+
+async function loadTranslateModule(provider: "ollama" | "openai"): Promise<void> {
+  vi.resetModules();
+  setProviderEnv(provider);
+  await import("./translate");
+}
 
 describe("translate input validator", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await loadTranslateModule("ollama");
+  });
+
   it("accepts valid input", () => {
     const result = capturedValidator({
       text: "Hello",
@@ -134,8 +153,193 @@ describe("translate input validator", () => {
 });
 
 describe("translate handler", () => {
+  beforeEach(async () => {
+    vi.restoreAllMocks();
+    await loadTranslateModule("ollama");
+  });
+
+  it("calls Ollama API and returns translation", async () => {
+    const mockResponse = {
+      model: "translategemma:27b",
+      response: "  Hallo Welt  ",
+      done: true,
+      total_duration: 5000000000,
+      eval_count: 10,
+      eval_duration: 3000000000,
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockResponse),
+      })
+    );
+
+    const result = await capturedHandler({
+      data: { text: "Hello World", sourceLanguage: "en", targetLanguage: "de_DE" },
+    });
+
+    expect(result).toEqual({
+      translation: "Hallo Welt",
+      model: "translategemma:27b",
+      stats: {
+        totalDuration: 5000000000,
+        evalCount: 10,
+        evalDuration: 3000000000,
+      },
+    });
+
+    expect(fetch).toHaveBeenCalledOnce();
+    const [url, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
+    expect(url).toBe(`${TEST_BASE_URL}/api/generate`);
+    expect(options.method).toBe("POST");
+    expect(options.headers).toEqual({ "Content-Type": "application/json" });
+
+    const body = JSON.parse(options.body as string) as Record<string, unknown>;
+    expect(body["model"]).toBe("translategemma:27b");
+    expect(body["stream"]).toBe(false);
+    expect((body["options"] as Record<string, unknown>)["temperature"]).toBe(0.1);
+    expect((body["options"] as Record<string, unknown>)["num_predict"]).toBe(4096);
+    expect(body["prompt"]).toContain("Hello World");
+  });
+
+  it("uses custom model when provided", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            model: "custom-model",
+            response: "translated",
+            done: true,
+          }),
+      })
+    );
+
+    await capturedHandler({
+      data: {
+        text: "Hello",
+        sourceLanguage: "en",
+        targetLanguage: "de_DE",
+        model: "custom-model",
+      },
+    });
+
+    const body = JSON.parse(
+      ((fetch as Mock).mock.calls[0] as [string, RequestInit])[1].body as string
+    ) as Record<string, unknown>;
+    expect(body["model"]).toBe("custom-model");
+  });
+
+  it("throws on non-200 API response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal Server Error"),
+      })
+    );
+
+    await expect(
+      capturedHandler({
+        data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+      })
+    ).rejects.toThrow("Ollama API error: 500 - Internal Server Error");
+  });
+
+  it("throws on network error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("fetch failed")));
+
+    await expect(
+      capturedHandler({
+        data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+      })
+    ).rejects.toThrow("fetch failed");
+  });
+
+  it("passes an AbortSignal to fetch", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            model: "translategemma:27b",
+            response: "result",
+            done: true,
+          }),
+      })
+    );
+
+    await capturedHandler({
+      data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+    });
+
+    const options = ((fetch as Mock).mock.calls[0] as [string, RequestInit])[1];
+    expect(options.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it("handles response with missing optional stats", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            model: "translategemma:27b",
+            response: "translated text",
+            done: true,
+          }),
+      })
+    );
+
+    const result = await capturedHandler({
+      data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+    });
+
+    expect(result).toEqual({
+      translation: "translated text",
+      model: "translategemma:27b",
+      stats: {
+        totalDuration: undefined,
+        evalCount: undefined,
+        evalDuration: undefined,
+      },
+    });
+  });
+
+  it("trims whitespace from response", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            model: "translategemma:27b",
+            response: "\n  translated text  \n",
+            done: true,
+          }),
+      })
+    );
+
+    const result = (await capturedHandler({
+      data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+    })) as { translation: string };
+
+    expect(result.translation).toBe("translated text");
+  });
+});
+
+describe("translate handler (openai)", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  beforeEach(async () => {
+    await loadTranslateModule("openai");
   });
 
   it("calls OpenAI-compatible API and returns translation", async () => {
@@ -170,7 +374,7 @@ describe("translate handler", () => {
     // Verify fetch was called with correct URL and body
     expect(fetch).toHaveBeenCalledOnce();
     const [url, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("http://localhost:11434/v1/chat/completions");
+    expect(url).toBe(`${TEST_BASE_URL}/v1/chat/completions`);
     expect(options.method).toBe("POST");
     expect(options.headers).toEqual({ "Content-Type": "application/json" });
 
@@ -179,7 +383,7 @@ describe("translate handler", () => {
     expect(body["stream"]).toBe(false);
     expect(body["temperature"]).toBe(0.1);
     expect(body["max_tokens"]).toBe(4096);
-    const messages = body["messages"] as Array<Record<string, unknown>>;
+    const messages = body["messages"] as Record<string, unknown>[];
     expect(messages[0]?.["role"]).toBe("user");
     expect(messages[0]?.["content"]).toContain("Hello World");
   });
@@ -255,10 +459,10 @@ describe("translate handler", () => {
 
     expect((fetch as Mock).mock.calls).toHaveLength(2);
     expect(((fetch as Mock).mock.calls[0] as [string])[0]).toBe(
-      "http://localhost:11434/v1/chat/completions"
+      `${TEST_BASE_URL}/v1/chat/completions`
     );
     expect(((fetch as Mock).mock.calls[1] as [string])[0]).toBe(
-      "http://localhost:11434/api/v1/chat/completions"
+      `${TEST_BASE_URL}/api/v1/chat/completions`
     );
 
     expect(result).toEqual({
