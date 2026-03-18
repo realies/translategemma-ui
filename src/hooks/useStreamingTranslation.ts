@@ -16,8 +16,14 @@ interface Stats {
 }
 
 function parseFinalStats(parsed: OllamaStreamLine): Stats | null {
-  if (parsed.total_duration === undefined) return null;
-  const stats: Stats = { duration: Math.round(parsed.total_duration / 1_000_000_000) };
+  const hasDuration = parsed.total_duration !== undefined;
+  const hasTokens = parsed.eval_count !== undefined;
+  if (!hasDuration && !hasTokens) return null;
+
+  const stats: Stats = {};
+  if (hasDuration && parsed.total_duration !== undefined) {
+    stats.duration = Math.round(parsed.total_duration / 1_000_000_000);
+  }
   if (parsed.eval_count !== undefined) stats.tokens = parsed.eval_count;
   return stats;
 }

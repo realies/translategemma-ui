@@ -31,3 +31,4 @@ src/routeTree.gen.ts
 # Local dev instructions
 CLAUDE.md
 
+.env.local

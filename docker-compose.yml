@@ -9,7 +9,9 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
-      - OLLAMA_URL=http://host.docker.internal:11434
+      - LLM_PROVIDER=openai
+      - OPENAI_BASE_URL=http://host.docker.internal:8080/api
+      - OPENAI_API_KEY=
       - DEFAULT_MODEL=translategemma:27b
     extra_hosts:
       - "host.docker.internal:host-gateway"

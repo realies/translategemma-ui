@@ -1,6 +1,6 @@
 /**
  * Generates static translations of all UI labels for every supported language.
- * Calls the local Ollama API once per language with all labels batched.
+ * Calls the configured LLM provider once per language with all labels batched.
  *
  * Usage: node scripts/generate-labels.mjs
  * Output: src/lib/translatedLabels.ts
@@ -13,9 +13,33 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(__dirname, "..");
 
-const OLLAMA_URL = process.env.OLLAMA_URL || "http://localhost:11434";
+const LLM_PROVIDER = process.env.LLM_PROVIDER?.toLowerCase() === "openai" ? "openai" : "ollama";
+const OLLAMA_URL = (process.env.OLLAMA_URL || "http://localhost:11434").replace(/\/+$/, "");
+const OPENAI_BASE_URL = (process.env.OPENAI_BASE_URL ||
+  process.env.OLLAMA_URL ||
+  "http://localhost:11434"
+).replace(/\/+$/, "");
+const OPENAI_CHAT_COMPLETION_PATH = process.env.OPENAI_CHAT_COMPLETION_PATH;
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
 const MODEL = process.env.DEFAULT_MODEL || "translategemma:27b";
 const DELIMITER = "\n---\n";
+
+function buildOpenAIChatCompletionUrls(baseUrl) {
+  if (OPENAI_CHAT_COMPLETION_PATH && OPENAI_CHAT_COMPLETION_PATH.trim()) {
+    const customPath = OPENAI_CHAT_COMPLETION_PATH.startsWith("/")
+      ? OPENAI_CHAT_COMPLETION_PATH
+      : `/${OPENAI_CHAT_COMPLETION_PATH}`;
+    return [`${baseUrl}${customPath}`];
+  }
+
+  const normalizedBaseUrl = baseUrl.toLowerCase();
+  const defaults =
+    normalizedBaseUrl.endsWith("/api") || normalizedBaseUrl.endsWith("/v1")
+      ? ["/chat/completions", "/v1/chat/completions"]
+      : ["/v1/chat/completions", "/api/v1/chat/completions", "/api/chat/completions", "/chat/completions"];
+
+  return [...new Set(defaults.map((path) => `${baseUrl}${path}`))];
+}
 
 // Parse DEFAULT_LABELS from the source of truth (labels.ts)
 const labelsFile = readFileSync(resolve(projectRoot, "src/lib/labels.ts"), "utf-8");
@@ -40,28 +64,90 @@ Produce only the ${lang.name} translation, without any additional explanations o
 
 ${combined}`;
 
-  const response = await fetch(`${OLLAMA_URL}/api/generate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: MODEL,
-      prompt,
-      stream: false,
-      options: { temperature: 0.1, num_predict: 4096 },
-    }),
-    signal: AbortSignal.timeout(300_000),
-  });
+  let translations;
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`${lang.code}: HTTP ${response.status} - ${err}`);
+  if (LLM_PROVIDER === "ollama") {
+    const response = await fetch(`${OLLAMA_URL}/api/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: MODEL,
+        prompt,
+        stream: false,
+        options: { temperature: 0.1, num_predict: 4096 },
+      }),
+      signal: AbortSignal.timeout(300_000),
+    });
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`${lang.code}: HTTP ${response.status} - ${err}`);
+    }
+
+    const result = await response.json();
+    const content = result?.response;
+    if (typeof content !== "string") {
+      throw new Error(`${lang.code}: invalid Ollama response`);
+    }
+
+    translations = content
+      .trim()
+      .split(DELIMITER)
+      .map((s) => s.trim());
+  } else {
+    const chatCompletionUrls = buildOpenAIChatCompletionUrls(OPENAI_BASE_URL);
+    let response = null;
+    let routingError = null;
+
+    for (const url of chatCompletionUrls) {
+      const attempted = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(OPENAI_API_KEY ? { Authorization: `Bearer ${OPENAI_API_KEY}` } : {}),
+        },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: prompt }],
+          stream: false,
+          temperature: 0.1,
+          max_tokens: 4096,
+        }),
+        signal: AbortSignal.timeout(300_000),
+      });
+
+      if ((attempted.status === 404 || attempted.status === 405) && chatCompletionUrls.length > 1) {
+        const errorText = await attempted.text();
+        routingError = `${url} -> ${String(attempted.status)} - ${errorText}`;
+        continue;
+      }
+
+      response = attempted;
+      break;
+    }
+
+    if (!response) {
+      throw new Error(
+        `${lang.code}: no compatible chat completions endpoint found under ${OPENAI_BASE_URL}${routingError ? ` (${routingError})` : ""}`
+      );
+    }
+
+    if (!response.ok) {
+      const err = await response.text();
+      throw new Error(`${lang.code}: HTTP ${response.status} - ${err}`);
+    }
+
+    const result = await response.json();
+    const content = result?.choices?.[0]?.message?.content;
+    if (typeof content !== "string") {
+      throw new Error(`${lang.code}: invalid OpenAI-compatible response`);
+    }
+
+    translations = content
+      .trim()
+      .split(DELIMITER)
+      .map((s) => s.trim());
   }
-
-  const result = await response.json();
-  const translations = result.response
-    .trim()
-    .split(DELIMITER)
-    .map((s) => s.trim());
 
   // Build label map, falling back to English if delimiter parsing failed
   const map = {};

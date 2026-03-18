@@ -396,7 +396,9 @@ export function TranslationPanel() {
             </button>
             {stats && (
               <span className="text-xs text-zinc-300 dark:text-zinc-600">
-                {stats.duration}s{stats.tokens !== undefined && ` · ${String(stats.tokens)} tokens`}
+                {stats.duration !== undefined && `${String(stats.duration)}s`}
+                {stats.duration !== undefined && stats.tokens !== undefined && " · "}
+                {stats.tokens !== undefined && `${String(stats.tokens)} tokens`}
               </span>
             )}
           </div>
