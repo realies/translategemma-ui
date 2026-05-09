@@ -20,23 +20,23 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@tanstack/react-router": "1.169.1",
-    "@tanstack/react-start": "1.167.59",
+    "@tanstack/react-router": "1.169.2",
+    "@tanstack/react-start": "1.167.65",
     "@vitejs/plugin-react": "6.0.1",
-    "react": "19.2.5",
-    "react-dom": "19.2.5",
+    "react": "19.2.6",
+    "react-dom": "19.2.6",
     "srvx": "^0.11.15",
-    "vite": "8.0.10"
+    "vite": "8.0.11"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@playwright/test": "^1.59.1",
-    "@tailwindcss/vite": "4.2.4",
-    "@tanstack/router-cli": "^1.166.40",
+    "@tailwindcss/vite": "4.3.0",
+    "@tanstack/router-cli": "^1.166.43",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/node": "25.6.0",
+    "@types/node": "25.6.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "eslint": "9.39.2",
@@ -48,9 +48,9 @@
     "lint-staged": "^17.0.3",
     "prettier": "3.8.3",
     "prettier-plugin-tailwindcss": "0.8.0",
-    "tailwindcss": "4.2.4",
+    "tailwindcss": "4.3.0",
     "typescript": "5.9.3",
-    "typescript-eslint": "8.59.1",
+    "typescript-eslint": "8.59.2",
     "vitest": "^4.1.5"
   },
   "lint-staged": {
