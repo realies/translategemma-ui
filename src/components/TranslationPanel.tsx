@@ -36,6 +36,19 @@ export function TranslationPanel() {
     abort,
   } = useStreamingTranslation();
 
+  const [isWideView, setIsWideView] = useState(false);
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 768px)");
+    const update = () => {
+      setIsWideView(mql.matches);
+    };
+    update();
+    mql.addEventListener("change", update);
+    return () => {
+      mql.removeEventListener("change", update);
+    };
+  }, []);
+
   const [hydrated, setHydrated] = useState(false);
   const [sourceText, setSourceText] = useState("");
 
@@ -63,6 +76,7 @@ export function TranslationPanel() {
       const loadedSourceRecents = loadRecents("srcRecents", [...DEFAULT_SOURCE_RECENTS]);
       const loadedTargetRecents = loadRecents("tgtRecents", [...DEFAULT_TARGET_RECENTS]);
       // Ensure selected language is present in recents (without reordering if already there)
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage hydration after SSR; must not run during render to avoid hydration mismatch.
       setLanguageState({
         sourceLanguage: src,
         targetLanguage: tgt,
@@ -73,20 +87,34 @@ export function TranslationPanel() {
           ? loadedTargetRecents
           : addToRecents(loadedTargetRecents, tgt),
       });
-      // Set isWideView in same tick so we don't get an extra render from the matchMedia useEffect
-      const mql = window.matchMedia("(min-width: 768px)");
-      setIsWideView(mql.matches);
     } catch {
       // Keep defaults
     }
     setHydrated(true);
   }, []);
 
+  // Language setters; ensure recents stays in sync when callers bypass LanguageSelector
+  // (e.g. swap, same-language collision). LanguageSelector itself already updates recents
+  // via onRecentsChange, so the redundant set here is a no-op via includes-check.
   const setSourceLanguage = useCallback((code: string) => {
-    setLanguageState((prev) => ({ ...prev, sourceLanguage: code }));
+    setLanguageState((prev) => {
+      if (prev.sourceRecents.includes(code) || !VALID_LANGUAGE_CODES.has(code)) {
+        return { ...prev, sourceLanguage: code };
+      }
+      const sourceRecents = addToRecents(prev.sourceRecents, code);
+      saveRecents("srcRecents", sourceRecents);
+      return { ...prev, sourceLanguage: code, sourceRecents };
+    });
   }, []);
   const setTargetLanguage = useCallback((code: string) => {
-    setLanguageState((prev) => ({ ...prev, targetLanguage: code }));
+    setLanguageState((prev) => {
+      if (prev.targetRecents.includes(code) || !VALID_LANGUAGE_CODES.has(code)) {
+        return { ...prev, targetLanguage: code };
+      }
+      const targetRecents = addToRecents(prev.targetRecents, code);
+      saveRecents("tgtRecents", targetRecents);
+      return { ...prev, targetLanguage: code, targetRecents };
+    });
   }, []);
   const setSourceRecents = useCallback((next: string[]) => {
     setLanguageState((prev) => ({ ...prev, sourceRecents: next }));
@@ -94,34 +122,6 @@ export function TranslationPanel() {
   const setTargetRecents = useCallback((next: string[]) => {
     setLanguageState((prev) => ({ ...prev, targetRecents: next }));
   }, []);
-  // Add language to recents only when it's not already present (e.g. swap brings in a new one);
-  // never reorder existing recents — tab row stays stable for the sliding highlight.
-  useEffect(() => {
-    if (
-      !sourceLanguage ||
-      !VALID_LANGUAGE_CODES.has(sourceLanguage) ||
-      sourceRecents.includes(sourceLanguage)
-    )
-      return;
-    setLanguageState((prev) => {
-      const next = addToRecents(prev.sourceRecents, sourceLanguage);
-      saveRecents("srcRecents", next);
-      return { ...prev, sourceRecents: next };
-    });
-  }, [sourceLanguage, sourceRecents]);
-  useEffect(() => {
-    if (
-      !targetLanguage ||
-      !VALID_LANGUAGE_CODES.has(targetLanguage) ||
-      targetRecents.includes(targetLanguage)
-    )
-      return;
-    setLanguageState((prev) => {
-      const next = addToRecents(prev.targetRecents, targetLanguage);
-      saveRecents("tgtRecents", next);
-      return { ...prev, targetRecents: next };
-    });
-  }, [targetLanguage, targetRecents]);
 
   const [copied, setCopied] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -129,19 +129,6 @@ export function TranslationPanel() {
   const targetPanelRef = useRef<HTMLDivElement>(null);
   const languageRowRef = useRef<HTMLDivElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-
-  const [isWideView, setIsWideView] = useState(false);
-  useEffect(() => {
-    const mql = window.matchMedia("(min-width: 768px)");
-    const update = () => {
-      setIsWideView(mql.matches);
-    };
-    update();
-    mql.addEventListener("change", update);
-    return () => {
-      mql.removeEventListener("change", update);
-    };
-  }, []);
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);

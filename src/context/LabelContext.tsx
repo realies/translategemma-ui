@@ -19,6 +19,7 @@ export function LabelProvider({ children }: { children: ReactNode }) {
     const locale = detectTargetLocale();
     const resolved = getLabelsForLocale(locale);
     if (resolved !== DEFAULT_LABELS) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- navigator-based locale detection after SSR; must not run during render to avoid hydration mismatch.
       setLabels(resolved);
     }
   }, []);

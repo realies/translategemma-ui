@@ -122,10 +122,8 @@ export function LanguageSelector({
     width: number;
   } | null>(null);
 
-  const useAnchor = Boolean(isOpen && dropdownAnchorRef?.current);
-
   useLayoutEffect(() => {
-    if (!useAnchor || !dropdownAnchorRef?.current) {
+    if (!isOpen || !dropdownAnchorRef?.current) {
       setAnchorRect(null);
       setEndRect(null);
       return;
@@ -143,7 +141,7 @@ export function LanguageSelector({
       window.removeEventListener("scroll", measure, { capture: true });
       window.removeEventListener("resize", measure);
     };
-  }, [useAnchor, dropdownAnchorRef, dropdownEndRef]);
+  }, [isOpen, dropdownAnchorRef, dropdownEndRef]);
 
   // Measure active tab position for sliding highlight
   const measureHighlight = useCallback(() => {
@@ -229,11 +227,6 @@ export function LanguageSelector({
     },
     [recents, onChange, onRecentsChange, close]
   );
-
-  // Move cursor to first result whenever search changes
-  useEffect(() => {
-    setFocusedIndex(0);
-  }, [search]);
 
   // Scroll focused item into view
   useEffect(() => {
@@ -401,6 +394,7 @@ export function LanguageSelector({
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
+                  setFocusedIndex(0);
                 }}
                 onKeyDown={handleKeyDown}
                 aria-label={ariaSearch}
