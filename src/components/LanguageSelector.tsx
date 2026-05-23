@@ -410,7 +410,7 @@ export function LanguageSelector({
             </div>
             <ul
               ref={listRef}
-              className={`overflow-auto px-1.5 pb-1.5 [scrollbar-gutter:stable] ${anchorRect ? "min-h-0 flex-1" : "max-h-60"}`}
+              className={`[scrollbar-gutter:stable] overflow-auto px-1.5 pb-1.5 ${anchorRect ? "min-h-0 flex-1" : "max-h-60"}`}
               role="listbox"
             >
               {filteredLanguages.map((lang, index) => (
