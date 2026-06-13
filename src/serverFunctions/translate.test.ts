@@ -6,7 +6,7 @@ let capturedHandler: (ctx: { data: unknown }) => Promise<unknown>;
 
 vi.mock("@tanstack/react-start", () => ({
   createServerFn: () => ({
-    inputValidator: (fn: (data: unknown) => unknown) => {
+    validator: (fn: (data: unknown) => unknown) => {
       capturedValidator = fn;
       return {
         handler: (fn: (ctx: { data: unknown }) => Promise<unknown>) => {
