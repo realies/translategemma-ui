@@ -33,7 +33,7 @@ interface OllamaGenerateResponse {
 }
 
 export const translate = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown): TranslateInput => {
+  .validator((data: unknown): TranslateInput => {
     if (typeof data !== "object" || data === null) {
       throw new Error("Invalid input");
     }
