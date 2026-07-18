@@ -20,19 +20,19 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@tanstack/react-router": "1.170.17",
-    "@tanstack/react-start": "1.168.27",
+    "@tanstack/react-router": "1.170.18",
+    "@tanstack/react-start": "1.168.30",
     "@vitejs/plugin-react": "6.0.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
-    "srvx": "^0.11.21",
-    "vite": "8.1.4"
+    "srvx": "^0.11.22",
+    "vite": "8.1.5"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@playwright/test": "^1.61.1",
-    "@tailwindcss/vite": "4.3.2",
-    "@tanstack/router-cli": "^1.167.18",
+    "@tailwindcss/vite": "4.3.3",
+    "@tanstack/router-cli": "^1.167.21",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
@@ -47,10 +47,10 @@
     "jsdom": "^29.1.1",
     "lint-staged": "^17.0.8",
     "prettier": "3.9.5",
-    "prettier-plugin-tailwindcss": "0.8.0",
-    "tailwindcss": "4.3.2",
+    "prettier-plugin-tailwindcss": "0.8.1",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.63.0",
+    "typescript-eslint": "8.64.0",
     "vitest": "^4.1.10"
   },
   "lint-staged": {
