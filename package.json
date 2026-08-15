@@ -20,29 +20,29 @@
     "prepare": "husky"
   },
   "dependencies": {
-    "@tanstack/react-router": "1.170.19",
-    "@tanstack/react-start": "1.168.36",
+    "@tanstack/react-router": "1.170.25",
+    "@tanstack/react-start": "1.168.42",
     "@vitejs/plugin-react": "6.0.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "srvx": "^0.12.5",
-    "vite": "8.2.0"
+    "vite": "8.2.1"
   },
   "devDependencies": {
     "@eslint/js": "9.39.2",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "4.3.3",
-    "@tanstack/router-cli": "^1.167.22",
-    "@testing-library/jest-dom": "^7.0.0",
+    "@tanstack/router-cli": "^1.167.27",
+    "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.3",
-    "@types/node": "26.1.2",
+    "@testing-library/user-event": "^14.6.4",
+    "@types/node": "26.2.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.4",
-    "eslint": "10.8.0",
+    "eslint": "10.8.1",
     "eslint-config-prettier": "10.1.8",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "globals": "17.9.0",
+    "globals": "17.10.0",
     "husky": "^9.1.7",
     "jsdom": "^30.0.1",
     "lint-staged": "^17.3.0",
@@ -50,7 +50,7 @@
     "prettier-plugin-tailwindcss": "0.8.1",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "typescript-eslint": "8.66.0",
+    "typescript-eslint": "8.67.0",
     "vitest": "^4.1.10"
   },
   "lint-staged": {
