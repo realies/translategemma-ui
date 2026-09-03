@@ -5,6 +5,8 @@ node_modules/
 .output/
 .vinxi/
 dist/
+playwright-report/
+test-results/
 
 # Environment files
 .env
@@ -30,4 +32,3 @@ src/routeTree.gen.ts
 
 # Local dev instructions
 CLAUDE.md
-
