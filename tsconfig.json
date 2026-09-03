@@ -22,5 +22,5 @@
       "~/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "e2e/**/*", "*.config.*"]
+  "include": ["src/**/*", "*.config.*"]
 }

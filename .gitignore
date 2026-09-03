@@ -5,8 +5,6 @@ node_modules/
 .output/
 .vinxi/
 dist/
-playwright-report/
-test-results/
 
 # Environment files
 .env

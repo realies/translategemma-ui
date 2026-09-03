@@ -14,7 +14,6 @@
     "generate": "tsr generate",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:production-font": "npm run build && playwright test e2e/font-assets.spec.ts",
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
     "record-demo": "node scripts/record-demo.mjs",
