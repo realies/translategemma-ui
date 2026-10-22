@@ -5,6 +5,10 @@ on:
     branches:
       - main
   workflow_dispatch:
+  # Dependabot auto-merges land as GITHUB_TOKEN pushes, which start no workflows;
+  # a weekly build also picks up base-image security fixes.
+  schedule:
+    - cron: '17 6 * * 5'
 
 permissions:
   contents: read
