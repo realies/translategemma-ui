@@ -161,7 +161,7 @@ const httpServer = createServer(async (req, res) => {
 
     // Handle SSR for all other routes
     const request = new NodeRequest({ req, res });
-    const response = await handler(request);
+    const response = await handler.fetch(request);
     await sendNodeResponse(res, response);
   } catch (error) {
     console.error("Request error:", error);
