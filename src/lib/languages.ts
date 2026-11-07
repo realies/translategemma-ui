@@ -72,3 +72,9 @@ export function getLanguageName(code: string): string {
 }
 
 export const VALID_LANGUAGE_CODES = new Set(languages.map((l) => l.code));
+
+/** Source-only pseudo code: the server detects the language from the text. */
+export const AUTO_DETECT = "auto";
+
+/** Response header naming the language the server detected for an AUTO_DETECT request. */
+export const DETECTED_LANGUAGE_HEADER = "X-Detected-Language";

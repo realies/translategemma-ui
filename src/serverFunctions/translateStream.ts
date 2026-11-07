@@ -1,4 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
+import { detectLanguage } from "~/languageDetector";
+import { AUTO_DETECT, DETECTED_LANGUAGE_HEADER, VALID_LANGUAGE_CODES } from "~/lib/languages";
 import { buildTranslationPrompt } from "~/lib/prompt";
 
 const OLLAMA_URL = process.env["OLLAMA_URL"] ?? "http://localhost:11434";
@@ -37,6 +39,14 @@ export const translateStream = createServerFn({ method: "POST" })
       targetLanguage: input["targetLanguage"].trim(),
     };
 
+    if (result.sourceLanguage !== AUTO_DETECT && !VALID_LANGUAGE_CODES.has(result.sourceLanguage)) {
+      throw new Error("Unsupported source language");
+    }
+
+    if (!VALID_LANGUAGE_CODES.has(result.targetLanguage)) {
+      throw new Error("Unsupported target language");
+    }
+
     if (typeof input["model"] === "string") {
       result.model = input["model"];
     }
@@ -44,7 +54,12 @@ export const translateStream = createServerFn({ method: "POST" })
     return result;
   })
   .handler(async ({ data }) => {
-    const prompt = buildTranslationPrompt(data.text, data.sourceLanguage, data.targetLanguage);
+    const detected = data.sourceLanguage === AUTO_DETECT ? await detectLanguage(data.text) : null;
+    const prompt = buildTranslationPrompt(
+      data.text,
+      detected ?? data.sourceLanguage,
+      data.targetLanguage
+    );
 
     const response = await fetch(`${OLLAMA_URL}/api/generate`, {
       method: "POST",
@@ -67,6 +82,9 @@ export const translateStream = createServerFn({ method: "POST" })
     }
 
     return new Response(response.body, {
-      headers: { "Content-Type": "application/x-ndjson" },
+      headers: {
+        "Content-Type": "application/x-ndjson",
+        ...(detected && { [DETECTED_LANGUAGE_HEADER]: detected }),
+      },
     });
   });
