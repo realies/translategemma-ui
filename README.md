@@ -12,6 +12,7 @@ Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technol
 
 - **55 languages** — searchable language selector with recent language pills
 - **Auto-translate** — starts translating as you type, no button needed
+- **Auto-detect** — pick "Auto-detect" as the source and the server detects the language, no LLM round trip
 - **Local inference** — no data leaves your machine, powered by [Ollama](https://ollama.ai)
 - **Remembers preferences** — last used language pair and recents restored on reload
 - **Swap languages** — flip source and target with one click
@@ -51,12 +52,30 @@ ollama pull translategemma:4b    # fastest (~2.5GB)
 
 ## Configuration
 
-| Variable        | Default                  | Description                          |
-| --------------- | ------------------------ | ------------------------------------ |
-| `OLLAMA_URL`    | `http://localhost:11434` | Ollama API endpoint                  |
-| `DEFAULT_MODEL` | `translategemma:27b`     | Model to use (`27b`, `12b`, or `4b`) |
-| `PORT`          | `3000`                   | Server port                          |
-| `HOST`          | `0.0.0.0`                | Server host                          |
+| Variable                       | Default                  | Description                                                                                          |
+| ------------------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `OLLAMA_URL`                   | `http://localhost:11434` | Ollama API endpoint                                                                                  |
+| `DEFAULT_MODEL`                | `translategemma:27b`     | Model to use (`27b`, `12b`, or `4b`)                                                                 |
+| `PORT`                         | `3000`                   | Server port                                                                                          |
+| `HOST`                         | `0.0.0.0`                | Server host                                                                                          |
+| `LANGUAGE_DETECTOR`            | `lite`                   | Auto-detect engine: `lite` (CLD3) or `accurate` (GlotLID v4)                                         |
+| `LANGUAGE_DETECTOR_PRELOAD`    | `false`                  | `true` loads the engine when the server starts, `false` on the first auto-detect request             |
+| `LANGUAGE_DETECTOR_KEEP_ALIVE` | `5m`                     | Idle time before the engine unloads (`30s`, `5m`, `1h`, or seconds); negative = never, `0` = at once |
+
+The server refuses to start when one of these `LANGUAGE_DETECTOR*` values is invalid.
+
+## Source-Language Auto-Detection
+
+The engine runs in the back end, only for requests whose source is "Auto-detect". The detected language is used for the prompt and shown on the pill ("Auto-detect: German"). When the text has no letters, or the engine names no supported language, the request fails with "Couldn't detect the language. Choose the source language." There is no silent default.
+
+| Engine               | Short text (≤ 40 chars) | Longer text | Memory when loaded | Image size |
+| -------------------- | ----------------------- | ----------- | ------------------ | ---------- |
+| `lite` (CLD3)        | ~81%                    | ~97%        | ~+30 MB            | < 1 MB     |
+| `accurate` (GlotLID) | ~93%                    | ~98%        | ~+500 MB           | +105 MB    |
+
+Accuracy was measured on our own benchmark (Tatoeba and Wikipedia text in the 51 supported languages), so treat it as relative, not absolute. Memory is the server's RSS increase while the engine is loaded. Both engines ship in the Docker image, so switching is a matter of setting `LANGUAGE_DETECTOR`. Outside Docker, run `npm run fetch:glotlid` once before using `accurate`.
+
+The engine's lifecycle works like Ollama's model loading. It loads on the first auto-detect request, or at startup with `LANGUAGE_DETECTOR_PRELOAD=true`; a preload failure stops the server from starting. It unloads after `LANGUAGE_DETECTOR_KEEP_ALIVE` of idle time, never while a detection is running. The engine runs in a worker thread, and unloading ends that thread, so its memory is returned to the system.
 
 ## Supported Languages
 

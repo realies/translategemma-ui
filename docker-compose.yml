@@ -11,6 +11,9 @@ services:
       - NODE_ENV=production
       - OLLAMA_URL=http://host.docker.internal:11434
       - DEFAULT_MODEL=translategemma:27b
+      - LANGUAGE_DETECTOR=lite
+      - LANGUAGE_DETECTOR_PRELOAD=false
+      - LANGUAGE_DETECTOR_KEEP_ALIVE=5m
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
