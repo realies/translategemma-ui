@@ -21,8 +21,9 @@ const GERMAN = "Das ist ein kurzer deutscher Satz über das Wetter.";
 const assets = "dist/server/assets";
 const resolver = readdirSync(assets).find((f) => f.includes("server-fn-resolver"));
 assert.ok(resolver, `no server function manifest in ${assets}`);
-const [fnId] = /[0-9a-f]{64}/.exec(readFileSync(`${assets}/${resolver}`, "utf8")) ?? [];
-assert.ok(fnId, "no server function id in the manifest");
+const manifest = readFileSync(`${assets}/${resolver}`, "utf8");
+const [, fnId] = /"([0-9a-f]{64})":\s*\{\s*functionName:\s*"translateStream_/.exec(manifest) ?? [];
+assert.ok(fnId, "no translateStream server function id in the manifest");
 
 let prompt = "";
 const ollama = createServer((req, res) => {

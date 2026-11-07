@@ -64,18 +64,30 @@ jobs:
       - run: npm test
       - run: npm run build
       # The handler export shape broke dev before; prove the built server boots and renders.
+      # Preloading the lite detector boots the bundled worker chunk; detector-smoke then sends
+      # one auto-detect request through it (it hosts the fake Ollama on port 11435).
       - name: Smoke test production server
+        env:
+          LANGUAGE_DETECTOR_PRELOAD: "true"
+          OLLAMA_URL: http://127.0.0.1:11435
         run: |
           npm start &
           for i in $(seq 1 15); do
-            curl -fs http://127.0.0.1:3000/health && curl -fs http://127.0.0.1:3000/ | grep -q "<html" && exit 0
+            curl -fs http://127.0.0.1:3000/health && curl -fs http://127.0.0.1:3000/ | grep -q "<html" && ok=1 && break
             sleep 1
           done
-          exit 1
+          test "${ok:-}" = 1
+          node scripts/detector-smoke.mjs
+      - name: Invalid detector settings stop the server from starting
+        run: |
+          code=0
+          LANGUAGE_DETECTOR_KEEP_ALIVE=soon PORT=3001 timeout 30 node production-server.mjs || code=$?
+          test "$code" -eq 1 # 0 or 124 (still running) means the bad value was accepted
 
   docker:
     name: Docker image (language detectors)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -94,7 +106,7 @@ jobs:
             docker run -d --name "tg-$engine" -p 3000:3000 \
               -e LANGUAGE_DETECTOR="$engine" -e LANGUAGE_DETECTOR_PRELOAD=true \
               -e OLLAMA_URL=http://127.0.0.1:11435 translategemma-ui:ci
-            curl -fsS -o /dev/null --retry 60 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/health \
+            curl -fsS -o /dev/null --retry 60 --retry-delay 1 --retry-all-errors http://127.0.0.1:3000/health \
               || { docker logs "tg-$engine"; exit 1; }
             docker logs "tg-$engine" 2>&1 | grep "Language detector \"$engine .* loaded in"
             docker exec -i "tg-$engine" node --input-type=module - < scripts/detector-smoke.mjs
@@ -102,10 +114,9 @@ jobs:
           done
       - name: Invalid detector settings stop the server from starting
         run: |
-          if docker run --rm -e LANGUAGE_DETECTOR_KEEP_ALIVE=soon translategemma-ui:ci; then
-            echo "The server started with LANGUAGE_DETECTOR_KEEP_ALIVE=soon"
-            exit 1
-          fi
+          code=0
+          timeout 60 docker run --rm -e LANGUAGE_DETECTOR_KEEP_ALIVE=soon translategemma-ui:ci || code=$?
+          test "$code" -eq 1 # 0 or 124 (still running) means the bad value was accepted
       # The engine runs in a worker thread; unloading terminates it, which must return its memory.
       - name: Idle unload returns the accurate engine's memory
         run: |
@@ -113,7 +124,7 @@ jobs:
           docker run -d --name tg-rss -p 3000:3000 \
             -e LANGUAGE_DETECTOR=accurate -e LANGUAGE_DETECTOR_KEEP_ALIVE=3s \
             -e OLLAMA_URL=http://127.0.0.1:11435 translategemma-ui:ci
-          curl -fsS -o /dev/null --retry 60 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/health
+          curl -fsS -o /dev/null --retry 60 --retry-delay 1 --retry-all-errors http://127.0.0.1:3000/health
           rss() { docker exec tg-rss awk '/^VmRSS/ { print int($2 / 1024) }' /proc/1/status; }
           idle=$(rss)
           docker exec -i tg-rss node --input-type=module - < scripts/detector-smoke.mjs
