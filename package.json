@@ -17,6 +17,7 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run lint:check && npm run format:check",
     "record-demo": "node scripts/record-demo.mjs",
+    "fetch:glotlid": "node scripts/fetch-glotlid.mjs",
     "prepare": "husky"
   },
   "dependencies": {
