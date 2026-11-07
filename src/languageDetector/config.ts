@@ -21,8 +21,9 @@ const UNIT_MS: Record<string, number> = {
   m: 60_000,
   h: 3_600_000,
 };
-const DURATION_PART = /(\d+\.?\d*|\.\d+)(ns|us|µs|ms|s|m|h)/g;
-const DURATION = /^[-+]?(?:(?:\d+\.?\d*|\.\d+)(?:ns|us|µs|ms|s|m|h))+$/;
+// The number has exactly one way to match ("1.5", "1.", ".5"), so repeated parts can't backtrack.
+const DURATION_PART = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)/g;
+const DURATION = /^[-+]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|ms|s|m|h))+$/;
 
 function parseEngine(value = ""): EngineName {
   if (value === "") return "lite";

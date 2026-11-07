@@ -56,6 +56,12 @@ describe("parseDetectorConfig", () => {
     }
   });
 
+  it("rejects a long malformed duration without catastrophic backtracking", () => {
+    const start = performance.now();
+    expect(() => keepAlive(`${"99h".repeat(40)}x`)).toThrow("LANGUAGE_DETECTOR_KEEP_ALIVE");
+    expect(performance.now() - start).toBeLessThan(100);
+  });
+
   it("rejects idle times beyond the timer limit instead of overflowing", () => {
     expect(keepAlive("596h")).toBe(596 * 3_600_000);
     expect(() => keepAlive("597h")).toThrow("the longest idle time is 24 days");
