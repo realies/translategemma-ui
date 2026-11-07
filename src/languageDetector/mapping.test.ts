@@ -117,5 +117,8 @@ describe("zhVariant", () => {
     expect(zhVariant("忧郁")).toBe("zh_CN");
     expect(zhVariant("台湾很美")).toBe("zh_CN");
     expect(zhVariant("於是")).toBe("zh_CN"); // 於 stays in Simplified as a surname
+    expect(zhVariant("和諧")).toBe("zh_TW"); // 和 is in both (OpenCC lists it under 龢)
+    expect(zhVariant("等待")).toBe("zh_CN"); // 待 is in both (OpenCC lists it under 呆)
+    expect(zhVariant("等待時間")).toBe("zh_TW");
   });
 });
