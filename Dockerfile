@@ -3,14 +3,15 @@ FROM node:lts-alpine AS builder
 
 WORKDIR /app
 
+# GlotLID model for LANGUAGE_DETECTOR=accurate: pinned and checksum-verified. Fetched before the
+# dependencies so a package change does not download it again.
+COPY scripts/fetch-glotlid.mjs scripts/
+RUN node scripts/fetch-glotlid.mjs
+
 COPY package*.json ./
 
 # No dependency needs an install script on Linux (only the macOS-only fsevents has one).
 RUN npm ci --ignore-scripts
-
-# GlotLID model for LANGUAGE_DETECTOR=accurate: pinned and checksum-verified.
-COPY scripts/fetch-glotlid.mjs scripts/
-RUN node scripts/fetch-glotlid.mjs
 
 COPY . .
 
