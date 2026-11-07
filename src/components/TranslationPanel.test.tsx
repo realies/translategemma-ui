@@ -422,13 +422,25 @@ describe("TranslationPanel", () => {
       expect(localStorage.getItem("tgtLang")).toBe("de_DE");
     });
 
-    it("clears the detection when the text is cleared", async () => {
+    it("clears the detection when the text is cleared, so new text never shows it", async () => {
       const user = userEvent.setup();
       render(<TranslationPanel />);
 
       await detect(user, "de_DE", "German");
       await user.click(screen.getByTitle("Clear"));
+      expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
+      expect(swapButton()).toBeDisabled();
 
+      // New text whose request has not answered yet: still no detection to show or swap with.
+      mockTranslateStream.mockReturnValue(new Promise(() => undefined));
+      await user.type(textarea(), "Bonjour");
+      await waitFor(() => {
+        expect(mockTranslateStream).toHaveBeenLastCalledWith(
+          expect.objectContaining({
+            data: { text: "Bonjour", sourceLanguage: "auto", targetLanguage: "fr_FR" },
+          })
+        );
+      });
       expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
       expect(swapButton()).toBeDisabled();
     });
@@ -505,8 +517,22 @@ describe("TranslationPanel", () => {
       if (!sourceFrench) throw new Error("Expected a French (France) source pill");
       await user.click(sourceFrench);
 
+      // No same-language pair: the target takes its most recent other language.
       expect(localStorage.getItem("srcLang")).toBe("fr_FR");
-      expect(localStorage.getItem("tgtLang")).toBeNull(); // the target was not touched
+      expect(localStorage.getItem("tgtLang")).toBe("de_DE");
+    });
+
+    it("avoids a same-language pair when the detection equals the target picked as source", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "fr_FR", "French (France)");
+      const [sourceFrench] = screen.getAllByRole("button", { name: "French (France)" });
+      if (!sourceFrench) throw new Error("Expected a French (France) source pill");
+      await user.click(sourceFrench);
+
+      expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+      expect(localStorage.getItem("tgtLang")).toBe("de_DE");
     });
 
     it("restores auto-detect from localStorage", () => {

@@ -28,7 +28,10 @@ export function useStreamingTranslation() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
-  /** The language the server detected for the last auto request; kept while typing. */
+  /**
+   * The language the server detected for the last auto request; kept while typing, cleared when
+   * the text is emptied (setDetectedLanguage), a request fails, or a manual-source request starts.
+   */
   const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
 
   const controllerRef = useRef<AbortController | null>(null);
@@ -169,6 +172,7 @@ export function useStreamingTranslation() {
     stats,
     setStats,
     detectedLanguage,
+    setDetectedLanguage,
     startTranslation,
     abort,
   };

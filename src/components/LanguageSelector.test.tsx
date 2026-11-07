@@ -10,6 +10,9 @@ const defaultProps = {
   onRecentsChange: vi.fn(),
 };
 
+/** The desktop pill row: every button except the mobile and search buttons (aria-labelled). */
+const pills = () => screen.getAllByRole("button").filter((b) => !b.hasAttribute("aria-label"));
+
 describe("LanguageSelector", () => {
   it("renders the selected language name", () => {
     render(<LanguageSelector value="en" {...defaultProps} />);
@@ -152,13 +155,12 @@ describe("LanguageSelector", () => {
       />
     );
 
-    const pills = screen.getAllByRole("button").filter((b) => b.className.includes("rounded-2xl"));
-    expect(pills.map((b) => b.textContent)).toEqual([
+    // Auto-detect takes the fourth recent's place, so the row is as long as without it.
+    expect(pills().map((b) => b.textContent)).toEqual([
       "Auto-detect",
       "English",
       "French (France)",
       "German",
-      "Spanish (Mexico)",
     ]);
 
     await user.click(screen.getByRole("button", { name: "Search languages" }));
@@ -190,9 +192,49 @@ describe("LanguageSelector", () => {
     expect(names[1]).toContain("English");
   });
 
-  it("shows the detected language on the Auto-detect pill and mobile button", () => {
+  it("shows the detected language on the Auto-detect pill and, first, on the mobile button", () => {
     render(<LanguageSelector value="auto" {...defaultProps} allowAuto detectedLanguage="de_DE" />);
-    expect(screen.getAllByText("Auto-detect: German")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Auto-detect: German" })).toBeInTheDocument();
+    // The mobile button truncates, so the language leads and the auto label is cut first.
+    expect(screen.getByRole("button", { name: "Select language" })).toHaveTextContent(
+      /^German · Auto-detect$/
+    );
+  });
+
+  it("keeps the selected recent in the pill row when Auto-detect takes a slot", () => {
+    render(<LanguageSelector value="es_MX" {...defaultProps} allowAuto />);
+    expect(pills().map((b) => b.textContent)).toEqual([
+      "Auto-detect",
+      "English",
+      "French (France)",
+      "Spanish (Mexico)",
+    ]);
+  });
+
+  it("moves a recent hidden from the pill row to the front when picked", async () => {
+    const onRecentsChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <LanguageSelector value="en" {...defaultProps} onRecentsChange={onRecentsChange} allowAuto />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Spanish (Mexico)"));
+
+    expect(onRecentsChange).toHaveBeenCalledWith(["es_MX", "en", "fr_FR", "de_DE"]);
+  });
+
+  it("lists Auto-detect only before a search, so a typed code and Enter picks the language", async () => {
+    const onChange = vi.fn();
+    const user = userEvent.setup();
+    render(<LanguageSelector value="en" {...defaultProps} onChange={onChange} allowAuto />);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    await user.type(screen.getByPlaceholderText("Search languages..."), "de");
+    expect(screen.queryByText("Auto-detect", { selector: "li *" })).not.toBeInTheDocument();
+    await user.keyboard("{Enter}");
+
+    expect(onChange).toHaveBeenCalledWith("de_DE");
   });
 
   it("has no Auto-detect option unless allowed", async () => {

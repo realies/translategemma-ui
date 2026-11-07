@@ -33,6 +33,7 @@ export function TranslationPanel() {
     stats,
     setStats,
     detectedLanguage,
+    setDetectedLanguage,
     startTranslation,
     abort,
   } = useStreamingTranslation();
@@ -185,6 +186,8 @@ export function TranslationPanel() {
       setTranslatedText("");
       setError(null);
       setStats(null);
+      // The next text needs its own detection; never show (or swap with) the old one.
+      setDetectedLanguage(null);
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -254,6 +257,14 @@ export function TranslationPanel() {
                 setLocalStorage("tgtLang", effectiveSource);
                 setSourceText(translatedText);
                 setTranslatedText(sourceText);
+              } else if (code === targetLanguage) {
+                // Auto mode has no other concrete language to move across (no detection, or it
+                // equals the target): the target takes its most recent other language instead.
+                const nextTarget = targetRecents.find((c) => c !== code);
+                if (nextTarget) {
+                  setTargetLanguage(nextTarget);
+                  setLocalStorage("tgtLang", nextTarget);
+                }
               }
               setSourceLanguage(code);
               setLocalStorage("srcLang", code);

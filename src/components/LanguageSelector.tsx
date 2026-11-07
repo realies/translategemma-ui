@@ -184,11 +184,14 @@ export function LanguageSelector({
     };
   }, [measureHighlight]);
 
-  const visibleTabs = useMemo(() => recents.slice(0, MAX_RECENTS), [recents]);
-  const pills = useMemo(
-    () => (allowAuto ? [AUTO_DETECT, ...visibleTabs] : visibleTabs),
-    [allowAuto, visibleTabs]
-  );
+  // The Auto-detect pill takes one recent's place so the row stays as long as before, and the
+  // selected language always keeps its pill.
+  const visibleTabs = useMemo(() => {
+    const tabs = recents.slice(0, allowAuto ? MAX_RECENTS - 1 : MAX_RECENTS);
+    return recents.includes(value) && !tabs.includes(value) ? [...tabs.slice(0, -1), value] : tabs;
+  }, [recents, allowAuto, value]);
+  const autoPill = useMemo(() => (allowAuto ? [AUTO_DETECT] : []), [allowAuto]);
+  const pills = useMemo(() => [...autoPill, ...visibleTabs], [autoPill, visibleTabs]);
 
   // Track which tabs are newly added (for enter animation)
   const prevVisibleTabsRef = useRef<string[] | null>(null);
@@ -208,26 +211,29 @@ export function LanguageSelector({
   const isMobileDropdown = Boolean(anchorRect && anchorRect.height < MOBILE_ANCHOR_THRESHOLD);
 
   const filteredLanguages = useMemo(() => {
-    const options = allowAuto
-      ? [{ code: AUTO_DETECT, name: labelAutoDetect, nativeName: "" }, ...languages]
-      : languages;
+    // Auto-detect is listed only before a search, so typing a code ("de") and Enter picks it.
+    const options =
+      allowAuto && !search
+        ? [{ code: AUTO_DETECT, name: labelAutoDetect, nativeName: "" }, ...languages]
+        : languages;
     const filtered = options.filter(
       (lang) =>
         lang.name.toLowerCase().includes(search.toLowerCase()) ||
         lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
         lang.code.toLowerCase().includes(search.toLowerCase())
     );
-    // On mobile (no pill tabs), float the pills to the top when not searching
-    if (isMobileDropdown && !search && pills.length > 0) {
-      const pillSet = new Set(pills);
-      const top = pills
+    // On mobile (no pill tabs), float Auto-detect and the recents to the top when not searching
+    const floated = [...autoPill, ...recents];
+    if (isMobileDropdown && !search && floated.length > 0) {
+      const floatedSet = new Set(floated);
+      const top = floated
         .map((code) => filtered.find((l) => l.code === code))
         .filter(Boolean) as typeof filtered;
-      const rest = filtered.filter((l) => !pillSet.has(l.code));
+      const rest = filtered.filter((l) => !floatedSet.has(l.code));
       return [...top, ...rest];
     }
     return filtered;
-  }, [search, isMobileDropdown, pills, allowAuto, labelAutoDetect]);
+  }, [search, isMobileDropdown, autoPill, recents, allowAuto, labelAutoDetect]);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -240,12 +246,12 @@ export function LanguageSelector({
       onChange(code);
       // Only reorder recents when picking a new language (not already in visible tabs)
       // so the tab row stays stable for the sliding highlight animation
-      if (!recents.includes(code)) {
+      if (!visibleTabs.includes(code)) {
         onRecentsChange(addToRecents(recents, code));
       }
       close();
     },
-    [recents, onChange, onRecentsChange, close]
+    [recents, visibleTabs, onChange, onRecentsChange, close]
   );
 
   // Scroll focused item into view
@@ -283,7 +289,13 @@ export function LanguageSelector({
     [isOpen, focusedIndex, filteredLanguages, select, close]
   );
 
-  const selectedName = value ? nameOf(value) : defaultSelectLanguage;
+  // The mobile button truncates, so it leads with the detected language.
+  const selectedName =
+    value === AUTO_DETECT && detectedLanguage
+      ? `${getLanguageName(detectedLanguage)} · ${labelAutoDetect}`
+      : value
+        ? nameOf(value)
+        : defaultSelectLanguage;
 
   const dropdownStyle = anchorRect ? getDropdownPosition(anchorRect, endRect) : undefined;
 
@@ -308,10 +320,10 @@ export function LanguageSelector({
           <span className="truncate">{selectedName}</span>
         </button>
 
-        {/* Wide: recent language tabs with sliding highlight */}
+        {/* Wide: recent language tabs with sliding highlight; pr-6 keeps the shrinking Auto-detect pill out of the mask fade */}
         <div
           ref={tabContainerRef}
-          className="relative hidden min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex"
+          className="relative hidden min-w-0 flex-1 items-center overflow-hidden [mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] pr-6 [-webkit-mask-image:linear-gradient(to_right,black_0,black_calc(100%-1.5rem),transparent_100%)] md:flex"
         >
           {/* Sliding highlight — hidden while active tab is animating in */}
           {highlightStyle && !newTabCodes.has(value) && (
@@ -359,6 +371,8 @@ export function LanguageSelector({
                     ? "text-zinc-800 dark:text-zinc-100"
                     : "text-zinc-500 hover:text-zinc-700 dark:text-zinc-400 dark:hover:text-zinc-200",
                   isActive && isNew ? "bg-white/50 dark:bg-zinc-600/50" : "",
+                  // A long translated label must not push the selected recent out of view.
+                  code === AUTO_DETECT && !isActive ? "min-w-0 truncate" : "",
                 ]
                   .filter(Boolean)
                   .join(" ")}
