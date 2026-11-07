@@ -196,9 +196,10 @@ describe("LanguageSelector", () => {
     render(<LanguageSelector value="auto" {...defaultProps} allowAuto detectedLanguage="de_DE" />);
     expect(screen.getByRole("button", { name: "Auto-detect: German" })).toBeInTheDocument();
     // The mobile button truncates, so the language leads and the auto label is cut first.
-    expect(screen.getByRole("button", { name: "Select language" })).toHaveTextContent(
-      /^German · Auto-detect$/
-    );
+    // Screen readers get the same information as the visible text.
+    expect(
+      screen.getByRole("button", { name: "Select language: German · Auto-detect" })
+    ).toHaveTextContent(/^German · Auto-detect$/);
   });
 
   it("keeps the selected recent in the pill row when Auto-detect takes a slot", () => {

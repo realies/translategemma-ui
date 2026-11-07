@@ -29,10 +29,14 @@ export function useStreamingTranslation() {
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
   /**
-   * The language the server detected for the last auto request; kept while typing, cleared when
-   * the text is emptied (setDetectedLanguage), a request fails, or a manual-source request starts.
+   * The language the server detected for the last auto request, with the text it was detected
+   * from; kept while typing, cleared when the text is emptied (clearDetection), a request fails,
+   * or a manual-source request starts.
    */
-  const [detectedLanguage, setDetectedLanguage] = useState<string | null>(null);
+  const [detection, setDetection] = useState<{ language: string; text: string } | null>(null);
+  const clearDetection = useCallback(() => {
+    setDetection(null);
+  }, []);
 
   const controllerRef = useRef<AbortController | null>(null);
   const rafRef = useRef<number>(0);
@@ -58,7 +62,7 @@ export function useStreamingTranslation() {
       setError(null);
       setStats(null);
       setIsStreaming(true);
-      if (sourceLanguage !== AUTO_DETECT) setDetectedLanguage(null);
+      if (sourceLanguage !== AUTO_DETECT) setDetection(null);
 
       const controller = new AbortController();
       controllerRef.current = controller;
@@ -69,7 +73,9 @@ export function useStreamingTranslation() {
             data: { text, sourceLanguage, targetLanguage },
             signal: controller.signal,
           });
-          setDetectedLanguage(response.headers.get(DETECTED_LANGUAGE_HEADER));
+          if (controller.signal.aborted) return; // superseded while the response was on its way
+          const language = response.headers.get(DETECTED_LANGUAGE_HEADER);
+          setDetection(language ? { language, text } : null);
 
           if (!response.body) {
             throw new Error("No response body");
@@ -153,7 +159,7 @@ export function useStreamingTranslation() {
             return; // Expected cancellation
           }
           setError(err instanceof Error ? err.message : "Translation failed");
-          setDetectedLanguage(null);
+          setDetection(null);
           setIsStreaming(false);
         }
       })();
@@ -171,8 +177,8 @@ export function useStreamingTranslation() {
     setError,
     stats,
     setStats,
-    detectedLanguage,
-    setDetectedLanguage,
+    detection,
+    clearDetection,
     startTranslation,
     abort,
   };

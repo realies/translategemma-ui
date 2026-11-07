@@ -535,11 +535,80 @@ describe("TranslationPanel", () => {
       expect(localStorage.getItem("tgtLang")).toBe("de_DE");
     });
 
+    it("keeps showing a detection while typing, but only acts on one for the current text", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "de_DE", "German");
+      mockTranslateStream.mockReturnValue(new Promise(() => undefined));
+      await user.type(textarea(), " und mehr");
+
+      expect(screen.getByRole("button", { name: "Auto-detect: German" })).toBeInTheDocument();
+      expect(swapButton()).toBeDisabled();
+    });
+
+    it("ignores a pending detection whose request was cancelled", async () => {
+      let deliver: (response: Response) => void = () => undefined;
+      mockTranslateStream.mockReturnValueOnce(
+        new Promise<Response>((resolve) => {
+          deliver = resolve;
+        })
+      );
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Auto-detect" }));
+      await user.type(textarea(), "Hallo Welt");
+      await waitFor(() => {
+        expect(mockTranslateStream).toHaveBeenCalled();
+      });
+      const [{ signal }] = mockTranslateStream.mock.calls[0] as [{ signal: AbortSignal }];
+
+      await user.click(screen.getByTitle("Clear"));
+      expect(signal.aborted).toBe(true);
+      mockTranslateStream.mockReturnValue(new Promise(() => undefined));
+      await user.type(textarea(), "Bonjour");
+      deliver(mockStreamResponse("Translated", undefined, "de_DE"));
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
+      expect(swapButton()).toBeDisabled();
+    });
+
+    it("does nothing when the current target is reselected, even if it equals the detection", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "fr_FR", "French (France)");
+      const [, targetFrench] = screen.getAllByRole("button", { name: "French (France)" });
+      if (!targetFrench) throw new Error("Expected a French (France) target pill");
+      await user.click(targetFrench);
+
+      expect(localStorage.getItem("srcLang")).toBe("auto");
+      expect(localStorage.getItem("tgtLang")).toBe("fr_FR");
+      expect(textarea()).toHaveValue("Hallo Welt");
+    });
+
+    it("picks a default target when the target recents offer no other language", async () => {
+      localStorage.setItem("srcLang", "auto");
+      localStorage.setItem("tgtLang", "fr_FR");
+      localStorage.setItem("tgtRecents", JSON.stringify(["fr_FR"]));
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      const [sourceFrench] = screen.getAllByRole("button", { name: "French (France)" });
+      if (!sourceFrench) throw new Error("Expected a French (France) source pill");
+      await user.click(sourceFrench);
+
+      expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+      expect(localStorage.getItem("tgtLang")).toBe("de_DE");
+    });
+
     it("restores auto-detect from localStorage", () => {
       localStorage.setItem("srcLang", "auto");
       render(<TranslationPanel />);
 
-      const [sourceButton] = screen.getAllByRole("button", { name: "Select language" });
+      const [sourceButton] = screen.getAllByRole("button", { name: /^Select language/ });
       expect(sourceButton).toHaveTextContent("Auto-detect");
       expect(swapButton()).toBeDisabled();
     });

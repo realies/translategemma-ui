@@ -32,8 +32,8 @@ export function TranslationPanel() {
     setError,
     stats,
     setStats,
-    detectedLanguage,
-    setDetectedLanguage,
+    detection,
+    clearDetection,
     startTranslation,
     abort,
   } = useStreamingTranslation();
@@ -66,11 +66,15 @@ export function TranslationPanel() {
     targetRecents: [...DEFAULT_TARGET_RECENTS],
   });
   const { sourceLanguage, targetLanguage, sourceRecents, targetRecents } = languageState;
-  // Auto mode keeps sourceLanguage = "auto"; the language in effect is the server's detection,
-  // shown only while there is text it belongs to.
+  // Auto mode keeps sourceLanguage = "auto". The pill keeps showing the last detection while the
+  // user types; language actions (swap, collisions) use it only for the text it was detected from.
   const isAuto = sourceLanguage === AUTO_DETECT;
-  const detected = isAuto && sourceText.trim() ? detectedLanguage : null;
-  const effectiveSource = isAuto ? detected : sourceLanguage;
+  const detected = isAuto && sourceText.trim() ? (detection?.language ?? null) : null;
+  const effectiveSource = isAuto
+    ? detection?.text === sourceText
+      ? detected
+      : null
+    : sourceLanguage;
   const canSwap = Boolean(effectiveSource) && effectiveSource !== targetLanguage;
 
   useLayoutEffect(() => {
@@ -187,7 +191,7 @@ export function TranslationPanel() {
       setError(null);
       setStats(null);
       // The next text needs its own detection; never show (or swap with) the old one.
-      setDetectedLanguage(null);
+      clearDetection();
       return;
     }
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -260,7 +264,9 @@ export function TranslationPanel() {
               } else if (code === targetLanguage) {
                 // Auto mode has no other concrete language to move across (no detection, or it
                 // equals the target): the target takes its most recent other language instead.
-                const nextTarget = targetRecents.find((c) => c !== code);
+                const nextTarget =
+                  targetRecents.find((c) => c !== code) ??
+                  DEFAULT_TARGET_RECENTS.find((c) => c !== code);
                 if (nextTarget) {
                   setTargetLanguage(nextTarget);
                   setLocalStorage("tgtLang", nextTarget);
@@ -302,7 +308,8 @@ export function TranslationPanel() {
           <LanguageSelector
             value={targetLanguage}
             onChange={(code) => {
-              if (code === effectiveSource) {
+              // Reselecting the current target changes nothing, even when it equals the detection.
+              if (code !== targetLanguage && code === effectiveSource) {
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 abort();
                 setError(null);

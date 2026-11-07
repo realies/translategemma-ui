@@ -18,6 +18,12 @@ vi.mock("@tanstack/react-start", () => ({
   }),
 }));
 
+// The incoming request's abort signal, as getRequest() exposes it to the handler.
+let clientRequest = new AbortController();
+vi.mock("@tanstack/react-start/server", () => ({
+  getRequest: () => ({ signal: clientRequest.signal }),
+}));
+
 const mockDetectLanguage = vi.fn<(text: string) => Promise<string>>();
 vi.mock("~/languageDetector", () => ({
   detectLanguage: (text: string) => mockDetectLanguage(text),
@@ -150,6 +156,7 @@ describe("translateStream handler", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     mockDetectLanguage.mockReset();
+    clientRequest = new AbortController();
   });
 
   it("calls Ollama API with stream: true and returns a Response", async () => {
@@ -253,5 +260,30 @@ describe("translateStream handler", () => {
       capturedHandler({ data: { text: "12345", sourceLanguage: "auto", targetLanguage: "de_DE" } })
     ).rejects.toThrow("Couldn't detect the language. Choose the source language.");
     expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("does not call Ollama when the client cancels during detection", async () => {
+    mockDetectLanguage.mockImplementation(() => {
+      clientRequest.abort();
+      return Promise.resolve("de_DE");
+    });
+    stubOllama();
+
+    await expect(
+      capturedHandler({ data: { text: "Hallo", sourceLanguage: "auto", targetLanguage: "en" } })
+    ).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("aborts the Ollama request when the client cancels", async () => {
+    stubOllama();
+    await capturedHandler({
+      data: { text: "Hello", sourceLanguage: "en", targetLanguage: "de_DE" },
+    });
+    const [, options] = (fetch as Mock).mock.calls[0] as [string, RequestInit];
+
+    expect(options.signal?.aborted).toBe(false);
+    clientRequest.abort();
+    expect(options.signal?.aborted).toBe(true);
   });
 });

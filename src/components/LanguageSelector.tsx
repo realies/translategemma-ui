@@ -314,7 +314,7 @@ export function LanguageSelector({
             setIsOpen(true);
           }}
           className="flex min-w-0 flex-1 items-center py-2 pr-1 pl-3.5 text-left text-[13px] font-medium text-zinc-700 md:hidden dark:text-zinc-200"
-          aria-label={defaultSelectLanguage}
+          aria-label={value ? `${defaultSelectLanguage}: ${selectedName}` : defaultSelectLanguage}
           aria-expanded={isOpen}
         >
           <span className="truncate">{selectedName}</span>

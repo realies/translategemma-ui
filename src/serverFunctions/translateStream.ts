@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequest } from "@tanstack/react-start/server";
 import { detectLanguage } from "~/languageDetector";
 import { AUTO_DETECT, DETECTED_LANGUAGE_HEADER, VALID_LANGUAGE_CODES } from "~/lib/languages";
 import { buildTranslationPrompt } from "~/lib/prompt";
@@ -54,7 +55,10 @@ export const translateStream = createServerFn({ method: "POST" })
     return result;
   })
   .handler(async ({ data }) => {
+    // Aborts when the client cancels (new text, cleared input) or disconnects.
+    const { signal } = getRequest();
     const detected = data.sourceLanguage === AUTO_DETECT ? await detectLanguage(data.text) : null;
+    signal.throwIfAborted(); // cancelled during detection: don't queue work on Ollama
     const prompt = buildTranslationPrompt(
       data.text,
       detected ?? data.sourceLanguage,
@@ -73,7 +77,7 @@ export const translateStream = createServerFn({ method: "POST" })
           num_predict: 4096,
         },
       }),
-      signal: AbortSignal.timeout(300_000),
+      signal: AbortSignal.any([signal, AbortSignal.timeout(300_000)]),
     });
 
     if (!response.ok) {
