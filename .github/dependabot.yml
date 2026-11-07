@@ -5,10 +5,11 @@ updates:
     schedule:
       interval: weekly
     ignore:
-      # typescript-eslint supports only typescript <6.1 (TS 7 has no JS compiler API).
-      # Drop this once typescript-eslint's peer range allows newer TypeScript.
+      # TS 7.0 ships no compiler API, so typescript-eslint can't use it (peer range <6.1).
+      # TS 7.1 adds the API; let it through so the upgrade lands once typescript-eslint supports it.
+      # (The TS 6 + TS 7 npm-alias setup was skipped: Dependabot never updates aliased deps.)
       - dependency-name: typescript
-        versions: [">=6.1.0"]
+        versions: [">=6.1.0 <7.1.0"]
     groups:
       all-dependencies:
         update-types:
