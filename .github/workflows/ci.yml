@@ -72,3 +72,56 @@ jobs:
             sleep 1
           done
           exit 1
+
+  docker:
+    name: Docker image (language detectors)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          push: false
+          tags: translategemma-ui:ci
+      # Real app path in the Alpine image: preload at boot, then one auto-detect request.
+      - name: Both detectors preload and detect German
+        run: |
+          set -euo pipefail
+          for engine in lite accurate; do
+            docker run -d --name "tg-$engine" -p 3000:3000 \
+              -e LANGUAGE_DETECTOR="$engine" -e LANGUAGE_DETECTOR_PRELOAD=true \
+              -e OLLAMA_URL=http://127.0.0.1:11435 translategemma-ui:ci
+            curl -fsS -o /dev/null --retry 60 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/health \
+              || { docker logs "tg-$engine"; exit 1; }
+            docker logs "tg-$engine" 2>&1 | grep "Language detector \"$engine .* loaded in"
+            docker exec -i "tg-$engine" node --input-type=module - < scripts/detector-smoke.mjs
+            docker rm -f "tg-$engine"
+          done
+      - name: Invalid detector settings stop the server from starting
+        run: |
+          if docker run --rm -e LANGUAGE_DETECTOR_KEEP_ALIVE=soon translategemma-ui:ci; then
+            echo "The server started with LANGUAGE_DETECTOR_KEEP_ALIVE=soon"
+            exit 1
+          fi
+      # The engine runs in a worker thread; unloading terminates it, which must return its memory.
+      - name: Idle unload returns the accurate engine's memory
+        run: |
+          set -euo pipefail
+          docker run -d --name tg-rss -p 3000:3000 \
+            -e LANGUAGE_DETECTOR=accurate -e LANGUAGE_DETECTOR_KEEP_ALIVE=3s \
+            -e OLLAMA_URL=http://127.0.0.1:11435 translategemma-ui:ci
+          curl -fsS -o /dev/null --retry 60 --retry-delay 1 --retry-connrefused http://127.0.0.1:3000/health
+          rss() { docker exec tg-rss awk '/^VmRSS/ { print int($2 / 1024) }' /proc/1/status; }
+          idle=$(rss)
+          docker exec -i tg-rss node --input-type=module - < scripts/detector-smoke.mjs
+          loaded=$(rss)
+          sleep 6
+          docker logs tg-rss 2>&1 | grep 'Language detector "accurate .* unloaded'
+          unloaded=$(rss)
+          echo "RSS MB: idle $idle, loaded $loaded, after unload $unloaded"
+          test "$loaded" -ge $((idle + 300))
+          test "$unloaded" -le $((idle + 100))
+          docker rm -f tg-rss
