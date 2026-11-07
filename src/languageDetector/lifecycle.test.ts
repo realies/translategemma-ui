@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createLifecycle, type Engine } from "./lifecycle";
 
-/** A fake engine whose rank() resolves when the test says so. */
+/** A fake engine whose identify() resolves when the test says so. */
 function fakeEngines() {
   const engines: { close: ReturnType<typeof vi.fn>; onExit: () => void }[] = [];
   const pendingRanks: (() => void)[] = [];
@@ -14,13 +14,13 @@ function fakeEngines() {
     }
     const close = vi.fn(() => Promise.resolve());
     engines.push({ close, onExit });
-    const rank = (text: string) =>
-      new Promise<string[]>((resolve) => {
+    const identify = (text: string) =>
+      new Promise<string | null>((resolve) => {
         pendingRanks.push(() => {
-          resolve([text]);
+          resolve(text);
         });
       });
-    return Promise.resolve({ rank, close });
+    return Promise.resolve({ identify, close });
   });
   return {
     load,
@@ -41,7 +41,7 @@ function setup(keepAliveMs: number) {
   const lifecycle = createLifecycle({ name: "test", keepAliveMs, load: fake.load, log });
   /** Runs one detection to completion. */
   const detect = async (text = "x") => {
-    const result = lifecycle.rank(text);
+    const result = lifecycle.identify(text);
     await settle();
     fake.finishRanks();
     return result;
@@ -49,7 +49,7 @@ function setup(keepAliveMs: number) {
   return { ...fake, log, lifecycle, detect };
 }
 
-/** Runs queued promise callbacks (load, rank, close, logging) without moving the clock. */
+/** Runs queued promise callbacks (load, identify, close, logging) without moving the clock. */
 async function settle() {
   for (let i = 0; i < 20; i++) await Promise.resolve();
 }
@@ -73,7 +73,7 @@ describe("createLifecycle", () => {
     const { load, log, detect } = setup(60_000);
     expect(load).not.toHaveBeenCalled();
 
-    expect(await detect("Hallo")).toEqual(["Hallo"]);
+    expect(await detect("Hallo")).toBe("Hallo");
     expect(load).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith(
       expect.stringMatching(/^Language detector "test" loaded in \d+ ms$/)
@@ -94,11 +94,15 @@ describe("createLifecycle", () => {
 
   it("shares one load between concurrent requests", async () => {
     const { load, lifecycle, finishRanks, engines } = setup(60_000);
-    const results = Promise.all([lifecycle.rank("a"), lifecycle.rank("b"), lifecycle.rank("c")]);
+    const results = Promise.all([
+      lifecycle.identify("a"),
+      lifecycle.identify("b"),
+      lifecycle.identify("c"),
+    ]);
     await settle();
     finishRanks();
 
-    expect(await results).toEqual([["a"], ["b"], ["c"]]);
+    expect(await results).toEqual(["a", "b", "c"]);
     expect(load).toHaveBeenCalledTimes(1);
     expect(engines).toHaveLength(1);
   });
@@ -108,7 +112,7 @@ describe("createLifecycle", () => {
     await detect();
     await advance(4000);
 
-    const slow = lifecycle.rank("slow"); // in flight across the old deadline
+    const slow = lifecycle.identify("slow"); // in flight across the old deadline
     await advance(10_000);
     expect(engines[0]?.close).not.toHaveBeenCalled();
 
@@ -122,9 +126,9 @@ describe("createLifecycle", () => {
 
   it("waits for every overlapping detection before starting the idle timer", async () => {
     const { lifecycle, engines, finishOldestRank } = setup(1000);
-    const first = lifecycle.rank("a");
+    const first = lifecycle.identify("a");
     await settle();
-    const second = lifecycle.rank("b");
+    const second = lifecycle.identify("b");
     await settle();
     finishOldestRank();
     await first;
@@ -169,9 +173,9 @@ describe("createLifecycle", () => {
   it("fails the request when the load fails, and tries again on the next request", async () => {
     const { load, lifecycle, failNextLoad, detect } = setup(60_000);
     failNextLoad(new Error("model missing"));
-    await expect(lifecycle.rank("x")).rejects.toThrow("model missing");
+    await expect(lifecycle.identify("x")).rejects.toThrow("model missing");
 
-    expect(await detect("y")).toEqual(["y"]);
+    expect(await detect("y")).toBe("y");
     expect(load).toHaveBeenCalledTimes(2);
   });
 

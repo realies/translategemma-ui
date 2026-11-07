@@ -1,10 +1,11 @@
 // @vitest-environment node
-// Real engines in a real worker thread (Node runs engine.worker.ts from source).
+// Real engines in a real worker thread (engine.worker.mjs).
 import { randomBytes } from "node:crypto";
 import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type * as Detector from "./index";
+import type * as WorkerEngine from "./workerEngine";
 import { startEngineWorker } from "./workerEngine";
 
 const GERMAN = "Das ist ein kurzer deutscher Satz über das Wetter.";
@@ -36,19 +37,39 @@ describe("detectLanguage", () => {
     expect(console.info).not.toHaveBeenCalled();
   });
 
-  it("sends the engine at most 2000 characters, on one line", async () => {
-    const rank = vi.fn((_text: string) => Promise.resolve(["de"]));
-    vi.doMock("./workerEngine", () => ({
-      startEngineWorker: () => Promise.resolve({ rank, close: () => Promise.resolve() }),
+  /** A detector whose engine returns `label` for every text. */
+  async function startWithLabel(label: string | null) {
+    const identify = vi.fn((_text: string) => Promise.resolve(label));
+    vi.doMock("./workerEngine", async (importOriginal) => ({
+      ...(await importOriginal<typeof WorkerEngine>()),
+      startEngineWorker: () => Promise.resolve({ identify, close: () => Promise.resolve() }),
     }));
     vi.spyOn(console, "info").mockImplementation(() => undefined);
-    const { detectLanguage } = await start({});
+    return { identify, ...(await start({})) };
+  }
 
+  it("sends the engine at most 2000 characters, on one line", async () => {
+    const { identify, detectLanguage } = await startWithLabel("de");
     expect(await detectLanguage(" Hallo\n\tWelt  ")).toBe("de_DE");
-    expect(rank).toHaveBeenLastCalledWith("Hallo Welt");
+    expect(identify).toHaveBeenLastCalledWith("Hallo Welt");
     await detectLanguage("Hallo Welt ".repeat(1000));
-    expect(rank.mock.lastCall?.[0]).toHaveLength(2000);
+    expect(identify.mock.lastCall?.[0]).toHaveLength(2000);
   });
+
+  it("names a detected language the app doesn't support", async () => {
+    const { detectLanguage } = await startWithLabel("afr_Latn");
+    await expect(detectLanguage("Goeie môre")).rejects.toThrow(
+      "Detected Afrikaans (Latin), which isn't supported. Choose the source language."
+    );
+  });
+
+  it.each([null, "und", "zxx_Zsym"])(
+    "fails with the no-detection message for %s",
+    async (label) => {
+      const { detectLanguage, NO_DETECTION_MESSAGE } = await startWithLabel(label);
+      await expect(detectLanguage("Hallo")).rejects.toThrow(NO_DETECTION_MESSAGE);
+    }
+  );
 
   it("detects with the real lite engine (CLD3)", { timeout: 30_000 }, async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
@@ -70,11 +91,13 @@ describe("detectLanguage", () => {
     );
   });
 
-  it("fails when the only label is not an app language", { timeout: 30_000 }, async () => {
+  it("fails when the top label is not an app language", { timeout: 30_000 }, async () => {
     vi.spyOn(console, "info").mockImplementation(() => undefined);
-    const { detectLanguage, NO_DETECTION_MESSAGE } = await start({ LANGUAGE_DETECTOR: "lite" });
+    const { detectLanguage } = await start({ LANGUAGE_DETECTOR: "lite" });
     // CLD3 labels romanised Russian "bg-Latn", which the app does not prompt with.
-    await expect(detectLanguage("privet kak dela")).rejects.toThrow(NO_DETECTION_MESSAGE);
+    await expect(detectLanguage("privet kak dela")).rejects.toThrow(
+      "Detected Bulgarian (Latin), which isn't supported."
+    );
   });
 
   it("terminates the worker to unload (keep-alive 0)", { timeout: 30_000 }, async () => {
@@ -102,29 +125,24 @@ describe("detectLanguage", () => {
   });
 
   describe("without the GlotLID model", () => {
-    const noModel = () =>
-      vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(`${tmpdir()}/tgui-`));
-
-    it("refuses to start when preloading, saying how to fetch it", async () => {
-      noModel();
-      await expect(
-        start({ LANGUAGE_DETECTOR: "accurate", LANGUAGE_DETECTOR_PRELOAD: "true" })
-      ).rejects.toThrow(
-        /^Language detector accurate \(GlotLID v4\) failed to preload: GlotLID model not found at \/.*\/models\/glotlid-v4\.ftz\. Run "npm run fetch:glotlid" to download it\.$/
-      );
-    });
-
-    it("fails each lazy request with that error, retrying the load every time", async () => {
-      noModel();
-      vi.spyOn(console, "error").mockImplementation(() => undefined);
-      const { detectLanguage } = await start({ LANGUAGE_DETECTOR: "accurate" });
-      for (let i = 0; i < 2; i++) {
-        await expect(detectLanguage(GERMAN)).rejects.toThrow(
-          /^Language detection failed: GlotLID model not found at \/.*\/models\/glotlid-v4\.ftz\. Run "npm run fetch:glotlid" to download it\.$/
+    it.each(["true", "false"])(
+      "refuses to start, saying how to fetch it (preload %s)",
+      async (preload) => {
+        vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(`${tmpdir()}/tgui-`));
+        await expect(
+          start({ LANGUAGE_DETECTOR: "accurate", LANGUAGE_DETECTOR_PRELOAD: preload })
+        ).rejects.toThrow(
+          /^GlotLID model not found at \/.*\/models\/glotlid-v4\.ftz\. Run "npm run fetch:glotlid" to download it\.$/
         );
       }
-      expect(console.error).toHaveBeenCalledTimes(2);
-    });
+    );
+  });
+
+  it("refuses to start outside the app directory, where the worker is", async () => {
+    vi.spyOn(process, "cwd").mockReturnValue(mkdtempSync(`${tmpdir()}/tgui-`));
+    await expect(start({})).rejects.toThrow(
+      /^Language detector worker not found at \/.*\/src\/languageDetector\/engine\.worker\.mjs\. Start the server from the app directory\.$/
+    );
   });
 
   // CI does not download the 101 MB model, so this block is skipped there. Locally it runs
@@ -174,13 +192,13 @@ describe("startEngineWorker", () => {
   it("rejects a failed call and reports the worker's exit", { timeout: 30_000 }, async () => {
     const onExit = vi.fn();
     const engine = await startEngineWorker({ engine: "lite", modelPath: "" }, onExit);
-    expect(await engine.rank("Das ist ein Satz auf Deutsch.")).toEqual(["de"]);
+    expect(await engine.identify("Das ist ein Satz auf Deutsch.")).toBe("de");
 
-    await expect(engine.rank(null as unknown as string)).rejects.toThrow();
+    await expect(engine.identify(null as unknown as string)).rejects.toThrow();
     await vi.waitFor(() => {
       expect(onExit).toHaveBeenCalledTimes(1);
     });
-    await expect(engine.rank("Hallo")).rejects.toThrow(
+    await expect(engine.identify("Hallo")).rejects.toThrow(
       "Language detector worker exited with code 1"
     );
   });

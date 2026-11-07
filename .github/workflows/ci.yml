@@ -64,7 +64,7 @@ jobs:
       - run: npm test
       - run: npm run build
       # The handler export shape broke dev before; prove the built server boots and renders.
-      # Preloading the lite detector boots the bundled worker chunk; detector-smoke then sends
+      # Preloading the lite detector boots its worker; detector-smoke then sends
       # one auto-detect request through it (it hosts the fake Ollama on port 11435).
       - name: Smoke test production server
         env:

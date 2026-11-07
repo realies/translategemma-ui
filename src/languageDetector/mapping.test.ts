@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { languages, VALID_LANGUAGE_CODES } from "~/lib/languages";
 import { toAppCode, zhVariant } from "./mapping";
 
-const lite = (...labels: string[]) => toAppCode("lite", labels, "text");
-const accurate = (...labels: string[]) => toAppCode("accurate", labels, "text");
+const lite = (label: string) => toAppCode("lite", label, "text");
+const accurate = (label: string) => toAppCode("accurate", label, "text");
 const bases = [...new Set(languages.map((l) => l.code.split("_")[0] ?? l.code))];
 
 describe("toAppCode", () => {
@@ -28,19 +28,21 @@ describe("toAppCode", () => {
     expect(multi.sort()).toEqual(["ar", "fr", "pt", "sw", "zh"]);
   });
 
-  it("maps CLD3's legacy and folded codes", () => {
-    expect([lite("iw"), lite("tl"), lite("bs"), lite("ms"), lite("no")]).toEqual([
-      "he_IL",
-      "fil_PH",
-      "hr_HR",
-      "id_ID",
-      "no_NO",
-    ]);
+  it("maps CLD3's legacy codes", () => {
+    expect([lite("iw"), lite("tl"), lite("no")]).toEqual(["he_IL", "fil_PH", "no_NO"]);
+  });
+
+  it("never maps another language to a close app language", () => {
+    for (const label of ["bs", "ms", "af", "haw"]) expect(lite(label), label).toBeNull();
+    for (const label of ["bos_Latn", "zsm_Latn", "afr_Latn", "kpv_Cyrl"]) {
+      expect(accurate(label), label).toBeNull();
+    }
   });
 
   it("never maps CLD3's romanised labels", () => {
-    expect(lite("hi-Latn")).toBeNull();
-    expect(lite("ru-Latn", "bg-Latn", "zh-Latn", "ja-Latn", "el-Latn")).toBeNull();
+    for (const label of ["hi-Latn", "ru-Latn", "bg-Latn", "zh-Latn", "ja-Latn", "el-Latn"]) {
+      expect(lite(label), label).toBeNull();
+    }
   });
 
   it("maps GlotLID's regional and macrolanguage labels", () => {
@@ -63,8 +65,8 @@ describe("toAppCode", () => {
       [["pes_Arab", "prs_Arab", "fas_Arab"], "fa_IR"],
       [["swh_Latn", "swc_Latn"], "sw_TZ"],
       [["nob_Latn", "nno_Latn"], "no_NO"],
-      [["ind_Latn", "zsm_Latn"], "id_ID"],
-      [["hrv_Latn", "bos_Latn"], "hr_HR"],
+      [["ind_Latn"], "id_ID"],
+      [["hrv_Latn"], "hr_HR"],
       [["srp_Cyrl", "srp_Latn"], "sr_RS"],
       [["heb_Hebr"], "he_IL"],
       [["fil_Latn", "tgl_Latn"], "fil_PH"],
@@ -82,7 +84,7 @@ describe("toAppCode", () => {
 
   it("maps every Han-script GlotLID label to Chinese", () => {
     for (const label of ["cmn_Hani", "yue_Hani", "wuu_Hani", "lzh_Hani", "hak_Hani", "nan_Hani"]) {
-      expect(toAppCode("accurate", [label], "切換語言"), label).toBe("zh_TW");
+      expect(toAppCode("accurate", label, "切換語言"), label).toBe("zh_TW");
     }
   });
 
@@ -91,13 +93,6 @@ describe("toAppCode", () => {
       expect(accurate(label), label).toBeNull();
     }
   });
-
-  it("takes the first label that maps, skipping non-app languages", () => {
-    expect(accurate("afr_Latn", "hin_Latn", "nld_Latn", "deu_Latn")).toBe("nl_NL");
-    expect(lite("haw")).toBeNull();
-    expect(accurate("kpv_Cyrl", "zxx_Zsym")).toBeNull();
-    expect(accurate()).toBeNull();
-  });
 });
 
 describe("zhVariant", () => {
@@ -105,7 +100,7 @@ describe("zhVariant", () => {
     expect(zhVariant("这是简体中文的句子")).toBe("zh_CN");
     expect(zhVariant("這是繁體中文的句子")).toBe("zh_TW");
     expect(zhVariant("切換語言")).toBe("zh_TW");
-    expect(toAppCode("lite", ["zh"], "這是繁體中文的句子")).toBe("zh_TW");
+    expect(toAppCode("lite", "zh", "這是繁體中文的句子")).toBe("zh_TW");
   });
 
   it("uses zh_CN for text written the same in both scripts", () => {
@@ -113,12 +108,14 @@ describe("zhVariant", () => {
     expect(zhVariant("茶几")).toBe("zh_CN"); // 几 (small table) is Traditional too
   });
 
-  it("does not count 准 or 几 as Simplified, and knows common Traditional-only characters", () => {
-    expect(zhVariant("不准停車")).toBe("zh_TW");
-    expect(zhVariant("台灣很美")).toBe("zh_TW");
+  it("counts only characters OpenCC never keeps in the other script", () => {
+    expect(zhVariant("不准停車")).toBe("zh_TW"); // 准 is Traditional too
+    expect(zhVariant("台灣很美")).toBe("zh_TW"); // 台 is Traditional too
     expect(zhVariant("臺北")).toBe("zh_TW");
-    expect(zhVariant("於是他走了")).toBe("zh_TW");
     expect(zhVariant("比他帥一點。")).toBe("zh_TW");
+    expect(zhVariant("憂鬱")).toBe("zh_TW"); // outside the most common characters
+    expect(zhVariant("忧郁")).toBe("zh_CN");
     expect(zhVariant("台湾很美")).toBe("zh_CN");
+    expect(zhVariant("於是")).toBe("zh_CN"); // 於 stays in Simplified as a surname
   });
 });

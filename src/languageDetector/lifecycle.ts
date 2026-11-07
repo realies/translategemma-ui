@@ -1,6 +1,6 @@
-/** A loaded language-ID engine: ranks labels for a text, and frees its memory on close. */
+/** A loaded language-ID engine: its top label for a text (null if none); frees memory on close. */
 export interface Engine {
-  rank(text: string): Promise<string[]>;
+  identify(text: string): Promise<string | null>;
   close(): Promise<void>;
 }
 
@@ -85,10 +85,10 @@ export function createLifecycle({ name, keepAliveMs, load, log = console.info }:
         release();
       }
     },
-    async rank(text: string): Promise<string[]> {
+    async identify(text: string): Promise<string | null> {
       hold();
       try {
-        return await (await acquire()).rank(text);
+        return await (await acquire()).identify(text);
       } finally {
         release();
       }

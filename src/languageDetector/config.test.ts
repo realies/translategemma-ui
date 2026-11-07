@@ -31,9 +31,6 @@ describe("parseDetectorConfig", () => {
     expect(keepAlive("30s")).toBe(30_000);
     expect(keepAlive("5m")).toBe(300_000);
     expect(keepAlive("1h")).toBe(3_600_000);
-    expect(keepAlive("1h30m")).toBe(5_400_000);
-    expect(keepAlive("1.5s")).toBe(1500);
-    expect(keepAlive("250ms")).toBe(250);
     expect(keepAlive("90")).toBe(90_000); // plain seconds
     expect(keepAlive("0")).toBe(0);
     expect(keepAlive("0s")).toBe(0);
@@ -49,21 +46,21 @@ describe("parseDetectorConfig", () => {
     expect(() => parseDetectorConfig({ LANGUAGE_DETECTOR_PRELOAD: "yes" })).toThrow(
       'Invalid LANGUAGE_DETECTOR_PRELOAD "yes": use "true" or "false".'
     );
-    for (const value of ["5 minutes", "abc", "1d", "5m30", "m", "--1s", "1.2.3s"]) {
+    for (const value of ["5 minutes", "abc", "1d", "5m30", "m", "--1s", "1.5s", "1h30m", "250ms"]) {
       expect(() => keepAlive(value), value).toThrow(
         `Invalid LANGUAGE_DETECTOR_KEEP_ALIVE "${value}"`
       );
     }
   });
 
-  it("rejects a long malformed duration without catastrophic backtracking", () => {
-    const start = performance.now();
-    expect(() => keepAlive(`${"99h".repeat(40)}x`)).toThrow("LANGUAGE_DETECTOR_KEEP_ALIVE");
-    expect(performance.now() - start).toBeLessThan(100);
-  });
-
   it("rejects idle times beyond the timer limit instead of overflowing", () => {
     expect(keepAlive("596h")).toBe(596 * 3_600_000);
     expect(() => keepAlive("597h")).toThrow("the longest idle time is 24 days");
+  });
+
+  it("rejects preloading a detector that would unload right away", () => {
+    expect(() =>
+      parseDetectorConfig({ LANGUAGE_DETECTOR_PRELOAD: "true", LANGUAGE_DETECTOR_KEEP_ALIVE: "0" })
+    ).toThrow("LANGUAGE_DETECTOR_PRELOAD=true conflicts with LANGUAGE_DETECTOR_KEEP_ALIVE=0");
   });
 });

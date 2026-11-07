@@ -1,5 +1,6 @@
 import { languages } from "~/lib/languages";
 import type { EngineName } from "./config";
+import { SIMPLIFIED_ONLY, TRADITIONAL_ONLY } from "./zhScripts";
 
 // Bases with several app codes use the CLDR likely-subtag region of the bare language
 // (fr -> fr_FR, pt -> pt_BR, ar -> ar_EG, sw -> sw_TZ). Chinese is decided by script instead.
@@ -19,18 +20,13 @@ const BASE_TO_CODE = new Map(
     .map(({ code }) => [baseOf(code), PREFERRED_VARIANT[baseOf(code)] ?? code])
 );
 
-// Characters used in only one of Simplified and Traditional Chinese (准, 几 are in both).
-const SIMPLIFIED = new Set(
-  "这们说个国语来时会为对发过还进与问开关见现电话车东门马长书学觉经边动头买卖认让请谁读写听间钟钱节简单乐爱亲观欢应该样数网络图标显视频软设计业务专历师题类风飞鸟鱼龙万两气无实体华区级报场变员总处将军农产习义达运选连远适种称积统线给结绝继续维红纸细终组织换择护译贴键较输册录页码岁队阳阴际陆难鸡鲜旧论识试课调谈谢证议记讲许访评词诉误货质费贵资转轻辑递邮铁银错闭闻阅阶随静项顺须顾预领颜饭馆验黄齐龄复击块坏岛币点湾"
-);
-const TRADITIONAL = new Set(
-  "這們說個國語來時會為對發過還進與問開關見現電話車東門馬長書學覺經邊幾動頭買賣認讓請誰讀寫聽間鐘錢節簡單樂愛親觀歡應該樣數網絡圖標顯視頻軟設計業務專歷師題類風飛鳥魚龍萬兩氣無實體華區級報場變員總處將軍農產習義準達運選連遠適種稱積統線給結絕繼續維紅紙細終組織換擇護譯貼鍵較輸冊錄頁碼歲隊陽陰際陸難雞鮮舊論識試課調談謝證議記講許訪評詞訴誤貨質費貴資轉輕輯遞郵鐵銀錯閉聞閱階隨靜項順須顧預領顏飯館驗黃齊齡複擊復塊壞島幣於裡點灣臺"
-);
+const SIMPLIFIED = new Set(SIMPLIFIED_ONLY);
+const TRADITIONAL = new Set(TRADITIONAL_ONLY);
 
 /**
- * zh_TW when Traditional-only characters outnumber Simplified-only ones, else zh_CN.
- * Text made only of characters shared by both scripts reads the same in either, so it takes
- * zh_CN, the CLDR likely subtag of bare zh. Neither engine has a Traditional label of its own.
+ * zh_TW when Traditional-only characters outnumber Simplified-only ones, else zh_CN. Text with
+ * neither kind reads the same in both scripts, so it takes zh_CN, the CLDR likely subtag of
+ * bare zh. Neither engine has a Traditional label of its own.
  */
 export function zhVariant(text: string): "zh_CN" | "zh_TW" {
   let balance = 0;
@@ -43,7 +39,8 @@ export function zhVariant(text: string): "zh_CN" | "zh_TW" {
 
 // CLD3 (defuss-lid full pack) emits ISO 639-1 codes, including legacy ones. Romanised forms
 // ("hi-Latn", "ru-Latn", ...) are not app bases, so they never map.
-const CLD3_ALIASES: Partial<Record<string, string>> = { iw: "he", tl: "fil", bs: "hr", ms: "id" };
+// Malay (ms) and Bosnian (bs) are other languages, not Indonesian and Croatian.
+const CLD3_ALIASES: Partial<Record<string, string>> = { iw: "he", tl: "fil" };
 const cld3Base = (label: string) => CLD3_ALIASES[label] ?? label;
 
 // GlotLID labels per app base, by language and script. Only the script the app writes each
@@ -67,9 +64,9 @@ const GLOTLID_LABELS: Record<string, string> = {
   gu: "guj_Gujr",
   he: "heb_Hebr",
   hi: "hin_Deva",
-  hr: "hrv_Latn bos_Latn",
+  hr: "hrv_Latn",
   hu: "hun_Latn",
-  id: "ind_Latn zsm_Latn",
+  id: "ind_Latn",
   is: "isl_Latn",
   it: "ita_Latn",
   ja: "jpn_Jpan",
@@ -117,17 +114,9 @@ const LABEL_TO_BASE: Record<EngineName, (label: string) => string | undefined> =
   accurate: glotlidBase,
 };
 
-/** The first ranked engine label that maps to an app language, as an app code; null if none does. */
-export function toAppCode(
-  engine: EngineName,
-  labels: readonly string[],
-  text: string
-): string | null {
-  for (const label of labels) {
-    const base = LABEL_TO_BASE[engine](label);
-    if (base === "zh") return zhVariant(text);
-    const code = base && BASE_TO_CODE.get(base);
-    if (code) return code;
-  }
-  return null;
+/** The app code for an engine's label; null when the label is not an app language. */
+export function toAppCode(engine: EngineName, label: string, text: string): string | null {
+  const base = LABEL_TO_BASE[engine](label);
+  if (base === "zh") return zhVariant(text);
+  return (base && BASE_TO_CODE.get(base)) ?? null;
 }

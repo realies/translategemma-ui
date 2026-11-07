@@ -11,19 +11,8 @@ export interface DetectorConfig {
 const DEFAULT_KEEP_ALIVE_MS = 5 * 60_000; // Ollama's default
 const MAX_TIMER_MS = 2 ** 31 - 1; // setTimeout limit, about 24.8 days
 
-// Go time.ParseDuration units, as accepted by OLLAMA_KEEP_ALIVE.
-const UNIT_MS: Record<string, number> = {
-  ns: 1e-6,
-  us: 1e-3,
-  µs: 1e-3,
-  ms: 1,
-  s: 1000,
-  m: 60_000,
-  h: 3_600_000,
-};
-// The number has exactly one way to match ("1.5", "1.", ".5"), so repeated parts can't backtrack.
-const DURATION_PART = /(\d+(?:\.\d*)?|\.\d+)(ns|us|µs|ms|s|m|h)/g;
-const DURATION = /^[-+]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:ns|us|µs|ms|s|m|h))+$/;
+const UNIT_MS = { "": 1000, s: 1000, m: 60_000, h: 3_600_000 }; // no unit: seconds
+const KEEP_ALIVE = /^([-+]?\d+)([smh]?)$/;
 
 function parseEngine(value = ""): EngineName {
   if (value === "") return "lite";
@@ -37,21 +26,17 @@ function parsePreload(value = ""): boolean {
   throw new Error(`Invalid LANGUAGE_DETECTOR_PRELOAD "${value}": use "true" or "false".`);
 }
 
-/** Like OLLAMA_KEEP_ALIVE: a duration ("30s", "5m", "1h30m") or plain seconds ("300", "-1"). */
+/** Like OLLAMA_KEEP_ALIVE: whole seconds, minutes or hours ("30s", "5m", "1h"), or plain seconds. */
 function parseKeepAlive(value = ""): number {
   if (value === "") return DEFAULT_KEEP_ALIVE_MS;
-  let ms: number;
-  if (/^[-+]?\d+$/.test(value)) {
-    ms = Number(value) * 1000;
-  } else if (DURATION.test(value)) {
-    const sign = value.startsWith("-") ? -1 : 1;
-    const parts = [...value.matchAll(DURATION_PART)];
-    ms = sign * parts.reduce((sum, [, n, unit]) => sum + Number(n) * (UNIT_MS[unit ?? ""] ?? 0), 0);
-  } else {
+  const match = KEEP_ALIVE.exec(value);
+  if (!match) {
     throw new Error(
-      `Invalid LANGUAGE_DETECTOR_KEEP_ALIVE "${value}": use a duration such as 30s, 5m or 1h, or plain seconds. A negative value keeps the detector loaded; 0 unloads it after each request.`
+      `Invalid LANGUAGE_DETECTOR_KEEP_ALIVE "${value}": use a whole number with s, m or h (30s, 5m, 1h), or plain seconds. A negative value keeps the detector loaded; 0 unloads it after each request.`
     );
   }
+  const [, amount = "", unit = ""] = match;
+  const ms = Number(amount) * UNIT_MS[unit as keyof typeof UNIT_MS];
   if (ms > MAX_TIMER_MS) {
     throw new Error(
       `Invalid LANGUAGE_DETECTOR_KEEP_ALIVE "${value}": the longest idle time is 24 days. Use a negative value to keep the detector loaded.`
@@ -62,9 +47,15 @@ function parseKeepAlive(value = ""): number {
 
 /** Reads and validates the LANGUAGE_DETECTOR* variables; throws a message naming the bad one. */
 export function parseDetectorConfig(env: Partial<Record<string, string>>): DetectorConfig {
-  return {
+  const config = {
     engine: parseEngine(env["LANGUAGE_DETECTOR"]),
     preload: parsePreload(env["LANGUAGE_DETECTOR_PRELOAD"]),
     keepAliveMs: parseKeepAlive(env["LANGUAGE_DETECTOR_KEEP_ALIVE"]),
   };
+  if (config.preload && config.keepAliveMs === 0) {
+    throw new Error(
+      "LANGUAGE_DETECTOR_PRELOAD=true conflicts with LANGUAGE_DETECTOR_KEEP_ALIVE=0: the detector would unload right after loading. Remove one of them."
+    );
+  }
+  return config;
 }

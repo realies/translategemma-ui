@@ -27,8 +27,9 @@ ENV NODE_ENV=production
 COPY --from=builder /app/package*.json ./
 RUN npm ci --omit=dev --ignore-scripts
 
-# dist/server includes the language detector's worker entry (assets/engine.worker-*.js).
 COPY --from=builder --chown=node:node /app/dist ./dist
+# The language detector's worker and GlotLID model, read from the working directory.
+COPY --from=builder --chown=node:node /app/src/languageDetector/engine.worker.mjs ./src/languageDetector/
 COPY --from=builder --chown=node:node /app/models ./models
 COPY --from=builder --chown=node:node /app/production-server.mjs ./
 
