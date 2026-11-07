@@ -73,9 +73,14 @@ The engine runs in the back end, only for requests whose source is "Auto-detect"
 | `lite` (CLD3)        | ~81%                    | ~97%        | ~+30 MB            | < 1 MB     |
 | `accurate` (GlotLID) | ~93%                    | ~98%        | ~+500 MB           | +105 MB    |
 
-Accuracy was measured on our own benchmark (Tatoeba and Wikipedia text in the 51 supported languages), so treat it as relative, not absolute. Memory is the server's RSS increase while the engine is loaded. Both engines ship in the Docker image, so switching is a matter of setting `LANGUAGE_DETECTOR`. Outside Docker, run `npm run fetch:glotlid` once before using `accurate`.
+Accuracy was measured on our own benchmark (Tatoeba and Wikipedia text in the 51 supported languages), so treat it as relative, not absolute. Memory is the server's RSS increase while the engine is loaded. Both engines ship in the Docker image, so switching is a matter of setting `LANGUAGE_DETECTOR`. Outside Docker, run `npm run fetch:glotlid` once before using `accurate`, and start the server from the app directory (the model path `models/glotlid-v4.ftz` is relative to it).
 
-The engine's lifecycle works like Ollama's model loading. It loads on the first auto-detect request, or at startup with `LANGUAGE_DETECTOR_PRELOAD=true`; a preload failure stops the server from starting. It unloads after `LANGUAGE_DETECTOR_KEEP_ALIVE` of idle time, never while a detection is running. The engine runs in a worker thread, and unloading ends that thread, so its memory is returned to the system.
+Known weaknesses, measured on the same benchmark:
+
+- `lite` names a single language, and when that one is not supported the request fails with the error above. That happens for about 9% of short text (about 14% of text up to 15 characters) against almost never with `accurate`, and `lite` is weak on short English UI phrases ("Hello" reads as Finnish). Choose `accurate`, or pick the source manually, for very short text.
+- Croatian and Latin-script Serbian are hard to tell apart: `accurate` reads most short Croatian as Serbian (about 36% of short Croatian is detected correctly), and `lite` reads Latin-script Serbian as Croatian. Users of these languages should pick the source manually.
+
+The engine's lifecycle works like Ollama's model loading. It loads on the first auto-detect request, or at startup with `LANGUAGE_DETECTOR_PRELOAD=true`; a preload failure stops the server from starting. It unloads after `LANGUAGE_DETECTOR_KEEP_ALIVE` of idle time, never while a detection is running. The engine runs in a worker thread, and unloading ends that thread, which frees the engine's memory. How much of it the process hands back to the OS depends on the allocator: on macOS about 200 MB of freed `accurate` pages stay resident for reuse (the total does not grow over repeated loads).
 
 ## Supported Languages
 
