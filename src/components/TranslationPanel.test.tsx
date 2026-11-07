@@ -11,14 +11,18 @@ vi.mock("~/serverFunctions/translateStream", () => ({
 /** Build a Response whose body is an NDJSON stream Ollama-style. */
 function mockStreamResponse(
   translation: string,
-  stats?: { total_duration?: number; eval_count?: number; eval_duration?: number }
+  stats?: { total_duration?: number; eval_count?: number; eval_duration?: number },
+  detected?: string
 ) {
   const lines = [
     JSON.stringify({ response: translation, done: false }),
     JSON.stringify({ response: "", done: true, ...stats }),
   ];
   return new Response(lines.join("\n") + "\n", {
-    headers: { "Content-Type": "application/x-ndjson" },
+    headers: {
+      "Content-Type": "application/x-ndjson",
+      ...(detected ? { "X-Detected-Language": detected } : {}),
+    },
   });
 }
 
@@ -356,5 +360,162 @@ describe("TranslationPanel", () => {
 
     expect(screen.getByText(/4s/)).toBeInTheDocument();
     expect(screen.getByText(/3 tokens/)).toBeInTheDocument();
+  });
+
+  describe("auto-detect", () => {
+    const swapButton = () => screen.getByTitle("Swap languages");
+    const textarea = () => screen.getByPlaceholderText("Enter text to translate...");
+
+    /** Select Auto-detect, type text, and wait for the server's detection to show. */
+    async function detect(user: ReturnType<typeof userEvent.setup>, code: string, name: string) {
+      mockTranslateStream.mockResolvedValue(mockStreamResponse("Translated", undefined, code));
+      await user.click(screen.getByRole("button", { name: "Auto-detect" }));
+      await user.type(textarea(), "Hallo Welt");
+      await waitFor(
+        () => {
+          expect(screen.getByRole("button", { name: `Auto-detect: ${name}` })).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+    }
+
+    it("sends auto, shows the detected language, and swaps to it", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Auto-detect" }));
+      expect(swapButton()).toBeDisabled();
+      expect(localStorage.getItem("srcLang")).toBe("auto");
+
+      await detect(user, "de_DE", "German");
+      expect(mockTranslateStream).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: { text: "Hallo Welt", sourceLanguage: "auto", targetLanguage: "fr_FR" },
+        })
+      );
+      expect(localStorage.getItem("srcRecents") ?? "").not.toContain("auto");
+      expect(swapButton()).toBeEnabled();
+
+      await user.click(swapButton());
+      expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+      expect(localStorage.getItem("tgtLang")).toBe("de_DE");
+    });
+
+    it("disables swap when the detected language is the target", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "fr_FR", "French (France)");
+      expect(swapButton()).toBeDisabled();
+    });
+
+    it("moves the detected language, not auto, to the target on a source collision", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "de_DE", "German");
+      const [sourceFrench] = screen.getAllByRole("button", { name: "French (France)" });
+      if (!sourceFrench) throw new Error("Expected a French (France) source pill");
+      await user.click(sourceFrench);
+
+      expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+      expect(localStorage.getItem("tgtLang")).toBe("de_DE");
+    });
+
+    it("clears the detection when the text is cleared", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "de_DE", "German");
+      await user.click(screen.getByTitle("Clear"));
+
+      expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
+      expect(swapButton()).toBeDisabled();
+    });
+
+    it("clears the detection when a request fails", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "de_DE", "German");
+      mockTranslateStream.mockRejectedValue(new Error("Ollama API error: 500"));
+      await user.type(textarea(), " und so");
+
+      await waitFor(
+        () => {
+          expect(screen.getByText("Ollama API error: 500")).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+      expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
+      expect(swapButton()).toBeDisabled();
+    });
+
+    it("clears the detection as soon as a manual-source request starts", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "de_DE", "German");
+      // The manual request (and the auto one after it) never answer.
+      mockTranslateStream.mockReturnValue(new Promise(() => undefined));
+      await user.click(screen.getByRole("button", { name: "English" }));
+      await user.click(screen.getByRole("button", { name: /^Auto-detect/ }));
+
+      expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
+    });
+
+    it("shows the server's no-detection error and keeps swap disabled", async () => {
+      const message = "Couldn't detect the language. Choose the source language.";
+      mockTranslateStream.mockRejectedValue(new Error(message));
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Auto-detect" }));
+      await user.type(textarea(), "12345");
+
+      await waitFor(
+        () => {
+          expect(screen.getByText(message)).toBeInTheDocument();
+        },
+        { timeout: 3000 }
+      );
+      expect(screen.getByRole("button", { name: "Auto-detect" })).toBeInTheDocument();
+      expect(swapButton()).toBeDisabled();
+    });
+
+    it("swaps when the detected language is picked as the target", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await detect(user, "de_DE", "German");
+      const [, targetGerman] = screen.getAllByRole("button", { name: "German" });
+      if (!targetGerman) throw new Error("Expected a German target pill");
+      await user.click(targetGerman);
+
+      expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+      expect(localStorage.getItem("tgtLang")).toBe("de_DE");
+    });
+
+    it("never moves auto into the target when the target is picked as source before a detection", async () => {
+      const user = userEvent.setup();
+      render(<TranslationPanel />);
+
+      await user.click(screen.getByRole("button", { name: "Auto-detect" }));
+      const [sourceFrench] = screen.getAllByRole("button", { name: "French (France)" });
+      if (!sourceFrench) throw new Error("Expected a French (France) source pill");
+      await user.click(sourceFrench);
+
+      expect(localStorage.getItem("srcLang")).toBe("fr_FR");
+      expect(localStorage.getItem("tgtLang")).toBeNull(); // the target was not touched
+    });
+
+    it("restores auto-detect from localStorage", () => {
+      localStorage.setItem("srcLang", "auto");
+      render(<TranslationPanel />);
+
+      const [sourceButton] = screen.getAllByRole("button", { name: "Select language" });
+      expect(sourceButton).toHaveTextContent("Auto-detect");
+      expect(swapButton()).toBeDisabled();
+    });
   });
 });

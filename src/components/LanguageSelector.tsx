@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import type { RefObject } from "react";
-import { languages, getLanguageName, VALID_LANGUAGE_CODES } from "~/lib/languages";
+import { languages, getLanguageName, VALID_LANGUAGE_CODES, AUTO_DETECT } from "~/lib/languages";
 import { useLabel } from "~/context/LabelContext";
 
 const MAX_RECENTS = 4;
@@ -57,6 +57,10 @@ interface LanguageSelectorProps {
   dropdownAnchorRef?: RefObject<HTMLElement | null>;
   /** When set, the dropdown bottom edge aligns with this element's bottom (mobile). */
   dropdownEndRef?: RefObject<HTMLElement | null> | undefined;
+  /** Offer "Auto-detect" (AUTO_DETECT) as the first pill and list option (source side only). */
+  allowAuto?: boolean;
+  /** Language detected in auto mode, shown on the Auto-detect pill. */
+  detectedLanguage?: string | null;
 }
 
 export function loadRecents(storageKey: string, defaults: string[]): string[] {
@@ -103,8 +107,11 @@ export function LanguageSelector({
   onRecentsChange,
   dropdownAnchorRef,
   dropdownEndRef,
+  allowAuto = false,
+  detectedLanguage = null,
 }: LanguageSelectorProps) {
   const defaultSelectLanguage = useLabel("default.selectLanguage");
+  const labelAutoDetect = useLabel("label.autoDetect");
   const placeholderSearch = useLabel("placeholder.searchLanguages");
   const ariaSearch = useLabel("aria.searchLanguages");
   const noLanguagesFound = useLabel("empty.noLanguages");
@@ -159,9 +166,15 @@ export function LanguageSelector({
     });
   }, [value]);
 
+  const autoName = detectedLanguage
+    ? `${labelAutoDetect}: ${getLanguageName(detectedLanguage)}`
+    : labelAutoDetect;
+  const nameOf = (code: string) => (code === AUTO_DETECT ? autoName : getLanguageName(code));
+
+  // autoName: the Auto-detect pill changes width when a detection arrives
   useLayoutEffect(() => {
     measureHighlight();
-  }, [measureHighlight, recents]);
+  }, [measureHighlight, recents, autoName]);
 
   // Remeasure highlight on resize so it stays aligned
   useEffect(() => {
@@ -172,6 +185,10 @@ export function LanguageSelector({
   }, [measureHighlight]);
 
   const visibleTabs = useMemo(() => recents.slice(0, MAX_RECENTS), [recents]);
+  const pills = useMemo(
+    () => (allowAuto ? [AUTO_DETECT, ...visibleTabs] : visibleTabs),
+    [allowAuto, visibleTabs]
+  );
 
   // Track which tabs are newly added (for enter animation)
   const prevVisibleTabsRef = useRef<string[] | null>(null);
@@ -191,23 +208,26 @@ export function LanguageSelector({
   const isMobileDropdown = Boolean(anchorRect && anchorRect.height < MOBILE_ANCHOR_THRESHOLD);
 
   const filteredLanguages = useMemo(() => {
-    const filtered = languages.filter(
+    const options = allowAuto
+      ? [{ code: AUTO_DETECT, name: labelAutoDetect, nativeName: "" }, ...languages]
+      : languages;
+    const filtered = options.filter(
       (lang) =>
         lang.name.toLowerCase().includes(search.toLowerCase()) ||
         lang.nativeName.toLowerCase().includes(search.toLowerCase()) ||
         lang.code.toLowerCase().includes(search.toLowerCase())
     );
-    // On mobile (no pill tabs), float recents to the top when not searching
-    if (isMobileDropdown && !search && recents.length > 0) {
-      const recentSet = new Set(recents);
-      const top = recents
+    // On mobile (no pill tabs), float the pills to the top when not searching
+    if (isMobileDropdown && !search && pills.length > 0) {
+      const pillSet = new Set(pills);
+      const top = pills
         .map((code) => filtered.find((l) => l.code === code))
         .filter(Boolean) as typeof filtered;
-      const rest = filtered.filter((l) => !recentSet.has(l.code));
+      const rest = filtered.filter((l) => !pillSet.has(l.code));
       return [...top, ...rest];
     }
     return filtered;
-  }, [search, isMobileDropdown, recents]);
+  }, [search, isMobileDropdown, pills, allowAuto, labelAutoDetect]);
 
   const close = useCallback(() => {
     setIsOpen(false);
@@ -263,7 +283,7 @@ export function LanguageSelector({
     [isOpen, focusedIndex, filteredLanguages, select, close]
   );
 
-  const selectedName = value ? getLanguageName(value) : defaultSelectLanguage;
+  const selectedName = value ? nameOf(value) : defaultSelectLanguage;
 
   const dropdownStyle = anchorRect ? getDropdownPosition(anchorRect, endRect) : undefined;
 
@@ -303,7 +323,7 @@ export function LanguageSelector({
               }}
             />
           )}
-          {visibleTabs.map((code) => {
+          {pills.map((code) => {
             const isActive = code === value;
             const isNew = newTabCodes.has(code);
             return (
@@ -343,7 +363,7 @@ export function LanguageSelector({
                   .filter(Boolean)
                   .join(" ")}
               >
-                {getLanguageName(code)}
+                {nameOf(code)}
               </button>
             );
           })}

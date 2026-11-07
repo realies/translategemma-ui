@@ -137,4 +137,69 @@ describe("LanguageSelector", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
   });
+
+  it("offers Auto-detect as the first pill and option, and never adds it to recents", async () => {
+    const onChange = vi.fn();
+    const onRecentsChange = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <LanguageSelector
+        value="en"
+        {...defaultProps}
+        onChange={onChange}
+        onRecentsChange={onRecentsChange}
+        allowAuto
+      />
+    );
+
+    const pills = screen.getAllByRole("button").filter((b) => b.className.includes("rounded-2xl"));
+    expect(pills.map((b) => b.textContent)).toEqual([
+      "Auto-detect",
+      "English",
+      "French (France)",
+      "German",
+      "Spanish (Mexico)",
+    ]);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    expect(screen.getAllByRole("option")[0]).toHaveTextContent("Auto-detect");
+    await user.keyboard("{Enter}");
+
+    expect(onChange).toHaveBeenCalledWith("auto");
+    for (const [next] of onRecentsChange.mock.calls as [string[]][]) {
+      expect(next).not.toContain("auto");
+    }
+  });
+
+  it("lists Auto-detect first on mobile too, ahead of the floated recents", async () => {
+    const anchor = document.createElement("div");
+    anchor.getBoundingClientRect = () => DOMRect.fromRect({ x: 0, y: 0, width: 300, height: 40 });
+    const user = userEvent.setup();
+    render(
+      <LanguageSelector
+        value="en"
+        {...defaultProps}
+        allowAuto
+        dropdownAnchorRef={{ current: anchor }}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    const names = screen.getAllByRole("option").map((o) => o.textContent);
+    expect(names[0]).toContain("Auto-detect");
+    expect(names[1]).toContain("English");
+  });
+
+  it("shows the detected language on the Auto-detect pill and mobile button", () => {
+    render(<LanguageSelector value="auto" {...defaultProps} allowAuto detectedLanguage="de_DE" />);
+    expect(screen.getAllByText("Auto-detect: German")).toHaveLength(2);
+  });
+
+  it("has no Auto-detect option unless allowed", async () => {
+    const user = userEvent.setup();
+    render(<LanguageSelector value="en" {...defaultProps} />);
+
+    await user.click(screen.getByRole("button", { name: "Search languages" }));
+    expect(screen.queryByText("Auto-detect")).not.toBeInTheDocument();
+  });
 });

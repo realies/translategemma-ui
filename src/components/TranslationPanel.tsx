@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect, useLayoutEffect } from "react";
 import { LanguageSelector, loadRecents, addToRecents, saveRecents } from "./LanguageSelector";
 import { useStreamingTranslation } from "~/hooks/useStreamingTranslation";
-import { VALID_LANGUAGE_CODES } from "~/lib/languages";
+import { AUTO_DETECT, VALID_LANGUAGE_CODES } from "~/lib/languages";
 import { useLabel } from "~/context/LabelContext";
 
 /** Default recent language codes; exported for tests. */
@@ -32,6 +32,7 @@ export function TranslationPanel() {
     setError,
     stats,
     setStats,
+    detectedLanguage,
     startTranslation,
     abort,
   } = useStreamingTranslation();
@@ -64,13 +65,21 @@ export function TranslationPanel() {
     targetRecents: [...DEFAULT_TARGET_RECENTS],
   });
   const { sourceLanguage, targetLanguage, sourceRecents, targetRecents } = languageState;
+  // Auto mode keeps sourceLanguage = "auto"; the language in effect is the server's detection,
+  // shown only while there is text it belongs to.
+  const isAuto = sourceLanguage === AUTO_DETECT;
+  const detected = isAuto && sourceText.trim() ? detectedLanguage : null;
+  const effectiveSource = isAuto ? detected : sourceLanguage;
+  const canSwap = Boolean(effectiveSource) && effectiveSource !== targetLanguage;
 
   useLayoutEffect(() => {
     try {
       const storedSrc = localStorage.getItem("srcLang");
       const storedTgt = localStorage.getItem("tgtLang");
       const src =
-        storedSrc && VALID_LANGUAGE_CODES.has(storedSrc) ? storedSrc : DEFAULT_SOURCE_RECENTS[0];
+        storedSrc && (storedSrc === AUTO_DETECT || VALID_LANGUAGE_CODES.has(storedSrc))
+          ? storedSrc
+          : DEFAULT_SOURCE_RECENTS[0];
       const tgt =
         storedTgt && VALID_LANGUAGE_CODES.has(storedTgt) ? storedTgt : DEFAULT_TARGET_RECENTS[0];
       const loadedSourceRecents = loadRecents("srcRecents", [...DEFAULT_SOURCE_RECENTS]);
@@ -134,19 +143,20 @@ export function TranslationPanel() {
   const copyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleSwapLanguages = useCallback(() => {
-    if (!targetLanguage) return;
+    if (!targetLanguage || !effectiveSource || !canSwap) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     abort();
     setSourceLanguage(targetLanguage);
-    setTargetLanguage(sourceLanguage);
+    setTargetLanguage(effectiveSource);
     setLocalStorage("srcLang", targetLanguage);
-    setLocalStorage("tgtLang", sourceLanguage);
+    setLocalStorage("tgtLang", effectiveSource);
     setSourceText(translatedText);
     setTranslatedText(sourceText);
     setError(null);
     setStats(null);
   }, [
-    sourceLanguage,
+    effectiveSource,
+    canSwap,
     targetLanguage,
     sourceText,
     translatedText,
@@ -235,13 +245,13 @@ export function TranslationPanel() {
           <LanguageSelector
             value={sourceLanguage}
             onChange={(code) => {
-              if (code === targetLanguage) {
+              if (code === targetLanguage && effectiveSource && canSwap) {
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 abort();
                 setError(null);
                 setStats(null);
-                setTargetLanguage(sourceLanguage);
-                setLocalStorage("tgtLang", sourceLanguage);
+                setTargetLanguage(effectiveSource);
+                setLocalStorage("tgtLang", effectiveSource);
                 setSourceText(translatedText);
                 setTranslatedText(sourceText);
               }
@@ -255,13 +265,16 @@ export function TranslationPanel() {
             }}
             dropdownAnchorRef={isWideView ? sourcePanelRef : languageRowRef}
             dropdownEndRef={isWideView ? undefined : gridRef}
+            allowAuto
+            detectedLanguage={detected}
           />
         </div>
 
         <button
           type="button"
           onClick={handleSwapLanguages}
-          className="rounded-full p-2 text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-500 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
+          disabled={!canSwap}
+          className="rounded-full p-2 text-zinc-300 transition-colors hover:bg-zinc-100 hover:text-zinc-500 disabled:pointer-events-none disabled:opacity-40 dark:text-zinc-600 dark:hover:bg-zinc-800 dark:hover:text-zinc-400"
           title={titleSwap}
         >
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -278,7 +291,7 @@ export function TranslationPanel() {
           <LanguageSelector
             value={targetLanguage}
             onChange={(code) => {
-              if (code === sourceLanguage) {
+              if (code === effectiveSource) {
                 if (debounceRef.current) clearTimeout(debounceRef.current);
                 abort();
                 setError(null);
