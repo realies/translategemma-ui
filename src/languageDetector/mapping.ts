@@ -19,12 +19,12 @@ const BASE_TO_CODE = new Map(
     .map(({ code }) => [baseOf(code), PREFERRED_VARIANT[baseOf(code)] ?? code])
 );
 
-// Characters written differently in Simplified and Traditional Chinese.
+// Characters used in only one of Simplified and Traditional Chinese (准, 几 are in both).
 const SIMPLIFIED = new Set(
-  "这们说个国语来时会为对发过还进与问开关见现电话车东门马长书学觉经边几动头买卖认让请谁读写听间钟钱节简单乐爱亲观欢应该样数网络图标显视频软设计业务专历师题类风飞鸟鱼龙万两气无实体华区级报场变员总处将军农产习义准达运选连远适种称积统线给结绝继续维红纸细终组织换择护译贴键较输册录页码岁队阳阴际陆难鸡鲜旧论识试课调谈谢证议记讲许访评词诉误货质费贵资转轻辑递邮铁银错闭闻阅阶随静项顺须顾预领颜饭馆验黄齐龄复击块坏岛币"
+  "这们说个国语来时会为对发过还进与问开关见现电话车东门马长书学觉经边动头买卖认让请谁读写听间钟钱节简单乐爱亲观欢应该样数网络图标显视频软设计业务专历师题类风飞鸟鱼龙万两气无实体华区级报场变员总处将军农产习义达运选连远适种称积统线给结绝继续维红纸细终组织换择护译贴键较输册录页码岁队阳阴际陆难鸡鲜旧论识试课调谈谢证议记讲许访评词诉误货质费贵资转轻辑递邮铁银错闭闻阅阶随静项顺须顾预领颜饭馆验黄齐龄复击块坏岛币点湾"
 );
 const TRADITIONAL = new Set(
-  "這們說個國語來時會為對發過還進與問開關見現電話車東門馬長書學覺經邊幾動頭買賣認讓請誰讀寫聽間鐘錢節簡單樂愛親觀歡應該樣數網絡圖標顯視頻軟設計業務專歷師題類風飛鳥魚龍萬兩氣無實體華區級報場變員總處將軍農產習義準達運選連遠適種稱積統線給結絕繼續維紅紙細終組織換擇護譯貼鍵較輸冊錄頁碼歲隊陽陰際陸難雞鮮舊論識試課調談謝證議記講許訪評詞訴誤貨質費貴資轉輕輯遞郵鐵銀錯閉聞閱階隨靜項順須顧預領顏飯館驗黃齊齡複擊復塊壞島幣"
+  "這們說個國語來時會為對發過還進與問開關見現電話車東門馬長書學覺經邊幾動頭買賣認讓請誰讀寫聽間鐘錢節簡單樂愛親觀歡應該樣數網絡圖標顯視頻軟設計業務專歷師題類風飛鳥魚龍萬兩氣無實體華區級報場變員總處將軍農產習義準達運選連遠適種稱積統線給結絕繼續維紅紙細終組織換擇護譯貼鍵較輸冊錄頁碼歲隊陽陰際陸難雞鮮舊論識試課調談謝證議記講許訪評詞訴誤貨質費貴資轉輕輯遞郵鐵銀錯閉聞閱階隨靜項順須顧預領顏飯館驗黃齊齡複擊復塊壞島幣於裡點灣臺"
 );
 
 /**
@@ -50,7 +50,7 @@ const cld3Base = (label: string) => CLD3_ALIASES[label] ?? label;
 // language in is listed, so romanised twins (hin_Latn, arb_Latn, ...) never map.
 const GLOTLID_LABELS: Record<string, string> = {
   en: "eng_Latn",
-  ar: "arb_Arab ary_Arab arz_Arab acm_Arab apc_Arab ars_Arab aeb_Arab",
+  ar: "arb_Arab ary_Arab arz_Arab acm_Arab apc_Arab ars_Arab aeb_Arab arq_Arab",
   bg: "bul_Cyrl",
   bn: "ben_Beng",
   ca: "cat_Latn",

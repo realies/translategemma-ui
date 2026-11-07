@@ -46,7 +46,16 @@ describe("toAppCode", () => {
   it("maps GlotLID's regional and macrolanguage labels", () => {
     const groups: [string[], string][] = [
       [
-        ["arb_Arab", "ary_Arab", "arz_Arab", "acm_Arab", "apc_Arab", "ars_Arab", "aeb_Arab"],
+        [
+          "arb_Arab",
+          "ary_Arab",
+          "arz_Arab",
+          "acm_Arab",
+          "apc_Arab",
+          "ars_Arab",
+          "aeb_Arab",
+          "arq_Arab",
+        ],
         "ar_EG",
       ],
       [["ekk_Latn"], "et_EE"],
@@ -101,5 +110,15 @@ describe("zhVariant", () => {
 
   it("uses zh_CN for text written the same in both scripts", () => {
     expect(zhVariant("中文")).toBe("zh_CN");
+    expect(zhVariant("茶几")).toBe("zh_CN"); // 几 (small table) is Traditional too
+  });
+
+  it("does not count 准 or 几 as Simplified, and knows common Traditional-only characters", () => {
+    expect(zhVariant("不准停車")).toBe("zh_TW");
+    expect(zhVariant("台灣很美")).toBe("zh_TW");
+    expect(zhVariant("臺北")).toBe("zh_TW");
+    expect(zhVariant("於是他走了")).toBe("zh_TW");
+    expect(zhVariant("比他帥一點。")).toBe("zh_TW");
+    expect(zhVariant("台湾很美")).toBe("zh_CN");
   });
 });

@@ -1,6 +1,7 @@
 // @vitest-environment node
 // Real engines in a real worker thread (Node runs engine.worker.ts from source).
-import { existsSync, mkdtempSync } from "node:fs";
+import { randomBytes } from "node:crypto";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { describe, it, expect, vi, afterEach } from "vitest";
 import type * as Detector from "./index";
@@ -59,6 +60,11 @@ describe("detectLanguage", () => {
     expect(await detectLanguage("שלום לכולם, מה שלומכם היום?")).toBe("he_IL");
     expect(await detectLanguage("Kumusta ka na? Mabuti naman ako.")).toBe("fil_PH");
     expect(await detectLanguage("Bonjour tout le monde")).toBe("fr_FR");
+    // Lone surrogates (CLD3 rejects them) are dropped: half an emoji cut off by the 2000-char
+    // slice, or one sent on its own.
+    const split = `${"Das ist ein Satz über das Wetter. ".repeat(60).slice(0, 1999)}🙂`;
+    expect(await detectLanguage(split)).toBe("de_DE");
+    expect(await detectLanguage(`${GERMAN}\ud800`)).toBe("de_DE");
     expect(console.info).toHaveBeenCalledWith(
       expect.stringMatching(/^Language detector "lite \(CLD3\)" loaded in \d+ ms$/)
     );
@@ -104,7 +110,7 @@ describe("detectLanguage", () => {
       await expect(
         start({ LANGUAGE_DETECTOR: "accurate", LANGUAGE_DETECTOR_PRELOAD: "true" })
       ).rejects.toThrow(
-        'Language detector accurate (GlotLID v4) failed to preload: GlotLID model not found at models/glotlid-v4.ftz. Run "npm run fetch:glotlid" to download it.'
+        /^Language detector accurate \(GlotLID v4\) failed to preload: GlotLID model not found at \/.*\/models\/glotlid-v4\.ftz\. Run "npm run fetch:glotlid" to download it\.$/
       );
     });
 
@@ -114,7 +120,7 @@ describe("detectLanguage", () => {
       const { detectLanguage } = await start({ LANGUAGE_DETECTOR: "accurate" });
       for (let i = 0; i < 2; i++) {
         await expect(detectLanguage(GERMAN)).rejects.toThrow(
-          'Language detection failed: GlotLID model not found at models/glotlid-v4.ftz. Run "npm run fetch:glotlid" to download it.'
+          /^Language detection failed: GlotLID model not found at \/.*\/models\/glotlid-v4\.ftz\. Run "npm run fetch:glotlid" to download it\.$/
         );
       }
       expect(console.error).toHaveBeenCalledTimes(2);
@@ -148,6 +154,20 @@ describe("startEngineWorker", () => {
           () => undefined
         )
       ).rejects.toThrow("ENOENT");
+    }
+  );
+
+  it(
+    "says how to fix a corrupt GlotLID model instead of fastText's bare exception",
+    { timeout: 30_000 },
+    async () => {
+      const modelPath = `${mkdtempSync(`${tmpdir()}/tgui-`)}/glotlid-v4.ftz`;
+      writeFileSync(modelPath, randomBytes(4096));
+      await expect(
+        startEngineWorker({ engine: "accurate", modelPath }, () => undefined)
+      ).rejects.toThrow(
+        `Could not load the GlotLID model at ${modelPath} (the file may be corrupt). Run "npm run fetch:glotlid" to download it again.`
+      );
     }
   );
 

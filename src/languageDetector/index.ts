@@ -23,7 +23,7 @@ function loadEngine(engine: EngineName, onExit: () => void): Promise<Engine> {
   if (engine === "accurate" && !existsSync(modelPath)) {
     return Promise.reject(
       new Error(
-        `GlotLID model not found at ${GLOTLID_MODEL}. Run "npm run fetch:glotlid" to download it.`
+        `GlotLID model not found at ${modelPath}. Run "npm run fetch:glotlid" to download it.`
       )
     );
   }
@@ -62,7 +62,8 @@ export async function startLanguageDetector(env: Partial<Record<string, string>>
 
 /** The app language code of `text`; throws a user-facing message when there is none. */
 export async function detectLanguage(text: string): Promise<string> {
-  const sample = text.slice(0, MAX_DETECTION_CHARS);
+  // Lone surrogates (e.g. half an emoji cut off by the slice) are not text, and CLD3 rejects them.
+  const sample = text.slice(0, MAX_DETECTION_CHARS).replace(/\p{Cs}/gu, "");
   if (!/\p{L}/u.test(sample)) throw new Error(NO_DETECTION_MESSAGE);
 
   if (!detector) throw new Error("Language detector is not started (see src/server.ts)");

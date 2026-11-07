@@ -35,8 +35,15 @@ async function loadLite(): Promise<Rank> {
 /** GlotLID v4 via fastText: top-50 labels such as "deu_Latn", best first. */
 async function loadAccurate(modelPath: string): Promise<Rank> {
   const { getLIDModel } = await import("fasttext.wasm.js");
-  const lid = await getLIDModel({ modelPath: pathToFileURL(modelPath).href });
-  const model = await lid.load();
+  const model = await getLIDModel({ modelPath: pathToFileURL(modelPath).href })
+    .then((lid) => lid.load())
+    .catch((err: unknown) => {
+      // A corrupt file makes fastText throw a bare number (an emscripten exception pointer).
+      const reason = err instanceof Error ? err.message : "the file may be corrupt";
+      throw new Error(
+        `Could not load the GlotLID model at ${modelPath} (${reason}). Run "npm run fetch:glotlid" to download it again.`
+      );
+    });
   return (text) => {
     const ranked = model.predict(text, GLOTLID_TOP_K, 0);
     try {
