@@ -16,6 +16,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ابحث عن اللغات...",
     "aria.searchLanguages": "ابحث عن اللغات",
     "empty.noLanguages": "لم يتم العثور على أي لغات",
+    "label.autoDetect": "اكتشاف تلقائي",
   },
   ar_SA: {
     "placeholder.source": "أدخل النص المراد ترجمته...",
@@ -29,6 +30,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ابحث عن اللغات...",
     "aria.searchLanguages": "البحث عن اللغات",
     "empty.noLanguages": "لم يتم العثور على أي لغات",
+    "label.autoDetect": "اكتشاف تلقائي",
   },
   bg_BG: {
     "placeholder.source": "Въведете текста за превод...",
@@ -42,6 +44,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Търсене на езици...",
     "aria.searchLanguages": "Търсене на езици",
     "empty.noLanguages": "Не са намерени езици",
+    "label.autoDetect": "Автоматично разпознаване",
   },
   bn_IN: {
     "placeholder.source": "অনুবাদ করার জন্য এখানে লেখাটি লিখুন...",
@@ -55,6 +58,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ভাষা অনুসন্ধান করুন...",
     "aria.searchLanguages": "ভাষা অনুসন্ধান করুন",
     "empty.noLanguages": "কোনো ভাষাই পাওয়া যায়নি",
+    "label.autoDetect": "স্বয়ংক্রিয় শনাক্তকরণ",
   },
   ca_ES: {
     "placeholder.source": "Introduïu el text que voleu traduir...",
@@ -68,6 +72,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Cerqueu idiomes...",
     "aria.searchLanguages": "Cerca d’idiomes",
     "empty.noLanguages": "No s’han trobat idiomes",
+    "label.autoDetect": "Detecció automàtica",
   },
   cs_CZ: {
     "placeholder.source": "Zadejte text, který chcete přeložit...",
@@ -81,6 +86,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Hledat jazyky...",
     "aria.searchLanguages": "Hledat jazyky",
     "empty.noLanguages": "Nenalezeny žádné jazyky",
+    "label.autoDetect": "Automatická detekce",
   },
   da_DK: {
     "placeholder.source": "Indtast teksten, der skal oversættes ...",
@@ -94,6 +100,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Søg efter sprog ...",
     "aria.searchLanguages": "Søg efter sprog",
     "empty.noLanguages": "Ingen sprog fundet",
+    "label.autoDetect": "Automatisk registrering",
   },
   de_DE: {
     "placeholder.source": "Geben Sie den zu übersetzenden Text ein …",
@@ -107,6 +114,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Sprachen suchen …",
     "aria.searchLanguages": "Sprachen suchen",
     "empty.noLanguages": "Keine Sprachen gefunden",
+    "label.autoDetect": "Automatisch erkennen",
   },
   el_GR: {
     "placeholder.source": "Εισαγάγετε το κείμενο που θέλετε να μεταφράσετε...",
@@ -120,6 +128,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Αναζήτηση γλωσσών...",
     "aria.searchLanguages": "Αναζήτηση γλωσσών",
     "empty.noLanguages": "Δεν βρέθηκαν γλώσσες",
+    "label.autoDetect": "Αυτόματη ανίχνευση",
   },
   es_MX: {
     "placeholder.source": "Escriba el texto que desea traducir...",
@@ -133,6 +142,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Buscar idiomas...",
     "aria.searchLanguages": "Buscar idiomas",
     "empty.noLanguages": "No se encontraron idiomas",
+    "label.autoDetect": "Detección automática",
   },
   et_EE: {
     "placeholder.source": "Sisesta tõlgitav tekst...",
@@ -146,6 +156,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Otsi keeli...",
     "aria.searchLanguages": "Otsi keeli",
     "empty.noLanguages": "Keeli ei leitud",
+    "label.autoDetect": "Automaatne tuvastamine",
   },
   fa_IR: {
     "placeholder.source": "متنی را برای ترجمه وارد کنید...",
@@ -159,6 +170,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "جستجو در میان زبان‌ها...",
     "aria.searchLanguages": "جستجوی زبان‌ها",
     "empty.noLanguages": "زبانی یافت نشد",
+    "label.autoDetect": "تشخیص خودکار",
   },
   fi_FI: {
     "placeholder.source": "Kirjoita käännettävä teksti...",
@@ -172,6 +184,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Hae kielistä...",
     "aria.searchLanguages": "Hae kielistä",
     "empty.noLanguages": "Kieliä ei löytynyt",
+    "label.autoDetect": "Tunnista automaattisesti",
   },
   fil_PH: {
     "placeholder.source": "Ilagay ang teksto na isasalin...",
@@ -185,6 +198,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Maghanap ng mga wika...",
     "aria.searchLanguages": "Maghanap ng mga wika",
     "empty.noLanguages": "Walang nakitang wika",
+    "label.autoDetect": "Awtomatikong tukuyin",
   },
   fr_CA: {
     "placeholder.source": "Entrez le texte à traduire...",
@@ -198,6 +212,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Rechercher une langue...",
     "aria.searchLanguages": "Rechercher des langues",
     "empty.noLanguages": "Aucune langue trouvée",
+    "label.autoDetect": "Détection automatique",
   },
   fr_FR: {
     "placeholder.source": "Entrez le texte à traduire...",
@@ -211,6 +226,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Rechercher une langue...",
     "aria.searchLanguages": "Rechercher des langues",
     "empty.noLanguages": "Aucune langue trouvée",
+    "label.autoDetect": "Détection automatique",
   },
   gu_IN: {
     "placeholder.source": "અનુવાદ કરવા માટે અહીં ટેક્સ્ટ દાખલ કરો...",
@@ -224,6 +240,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ભાષાઓ શોધો...",
     "aria.searchLanguages": "ભાષાઓ શોધો",
     "empty.noLanguages": "કોઈ પણ ભાષા મળી નથી",
+    "label.autoDetect": "આપમેળે ઓળખો",
   },
   he_IL: {
     "placeholder.source": "הזן טקסט לתרגום...",
@@ -237,6 +254,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "חפש שפות...",
     "aria.searchLanguages": "חיפוש שפות",
     "empty.noLanguages": "לא נמצאו שפות",
+    "label.autoDetect": "זיהוי אוטומטי",
   },
   hi_IN: {
     "placeholder.source": "अनुवाद करने के लिए यहाँ पाठ दर्ज करें...",
@@ -250,6 +268,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "भाषाएँ खोजें...",
     "aria.searchLanguages": "भाषाएँ खोजें",
     "empty.noLanguages": "कोई भाषा नहीं मिली",
+    "label.autoDetect": "स्वतः पहचानें",
   },
   hr_HR: {
     "placeholder.source": "Unesite tekst za prijevod...",
@@ -263,6 +282,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Pretraži jezike...",
     "aria.searchLanguages": "Pretraži jezike",
     "empty.noLanguages": "Nisu pronađeni jezici",
+    "label.autoDetect": "Automatsko prepoznavanje",
   },
   hu_HU: {
     "placeholder.source": "Írja be a lefordítandó szöveget...",
@@ -276,6 +296,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Nyelvek keresése...",
     "aria.searchLanguages": "Nyelvek keresése",
     "empty.noLanguages": "Nincs találat",
+    "label.autoDetect": "Automatikus felismerés",
   },
   id_ID: {
     "placeholder.source": "Masukkan teks yang ingin diterjemahkan...",
@@ -289,6 +310,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Cari bahasa...",
     "aria.searchLanguages": "Cari bahasa",
     "empty.noLanguages": "Tidak ada bahasa yang ditemukan",
+    "label.autoDetect": "Deteksi otomatis",
   },
   is_IS: {
     "placeholder.source": "Setu inn textann sem þú vilt þýða...",
@@ -302,6 +324,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Leita að tungumálum...",
     "aria.searchLanguages": "Leita að tungumálum",
     "empty.noLanguages": "Engin tungumál fundust",
+    "label.autoDetect": "Greina sjálfkrafa",
   },
   it_IT: {
     "placeholder.source": "Inserisci il testo da tradurre...",
@@ -315,6 +338,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Cerca le lingue...",
     "aria.searchLanguages": "Cerca le lingue",
     "empty.noLanguages": "Nessuna lingua trovata",
+    "label.autoDetect": "Rilevamento automatico",
   },
   ja_JP: {
     "placeholder.source": "翻訳するテキストを入力してください。",
@@ -328,6 +352,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "言語を検索...",
     "aria.searchLanguages": "言語を検索",
     "empty.noLanguages": "該当する言語が見つかりませんでした",
+    "label.autoDetect": "自動検出",
   },
   kn_IN: {
     "placeholder.source": "ಅನುವಾದಿಸಲು ಪಠ್ಯವನ್ನು ನಮೂದಿಸಿ...",
@@ -341,6 +366,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ಭಾಷೆಗಳನ್ನು ಹುಡುಕಿ...",
     "aria.searchLanguages": "ಭಾಷೆಗಳನ್ನು ಹುಡುಕಿ",
     "empty.noLanguages": "ಯಾವುದೇ ಭಾಷೆಗಳು ಕಂಡುಬರಲಿಲ್ಲ",
+    "label.autoDetect": "ಸ್ವಯಂ ಪತ್ತೆ",
   },
   ko_KR: {
     "placeholder.source": "번역할 텍스트를 입력하세요...",
@@ -354,6 +380,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "언어 검색...",
     "aria.searchLanguages": "언어 검색",
     "empty.noLanguages": "해당하는 언어가 없습니다.",
+    "label.autoDetect": "자동 감지",
   },
   lt_LT: {
     "placeholder.source": "Įveskite tekstą, kurį norite išversti...",
@@ -367,6 +394,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Ieškoti kalbų...",
     "aria.searchLanguages": "Ieškoti kalbų",
     "empty.noLanguages": "Kalbos nerasta",
+    "label.autoDetect": "Automatinis aptikimas",
   },
   lv_LV: {
     "placeholder.source": "Ievadiet tekstu, ko vēlaties tulkot...",
@@ -380,6 +408,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Meklēt valodas...",
     "aria.searchLanguages": "Meklēt valodas",
     "empty.noLanguages": "Valodas netika atrastas",
+    "label.autoDetect": "Automātiskā noteikšana",
   },
   ml_IN: {
     "placeholder.source": "പരിഭാഷപ്പെടുത്തേണ്ട വാചകം ഇവിടെ നൽകുക...",
@@ -393,6 +422,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ഭാഷകൾ തിരയുക...",
     "aria.searchLanguages": "ഭാഷകൾ തിരയുക",
     "empty.noLanguages": "ഭാഷകൾ ഒന്നും കണ്ടെത്താനായില്ല",
+    "label.autoDetect": "സ്വയമേവ കണ്ടെത്തുക",
   },
   mr_IN: {
     "placeholder.source": "भाषांतर करण्यासाठी मजकूर प्रविष्ट करा...",
@@ -406,6 +436,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "भाषा शोधा...",
     "aria.searchLanguages": "भाषा शोधा",
     "empty.noLanguages": "कोणतीही भाषा आढळली नाही",
+    "label.autoDetect": "आपोआप ओळखा",
   },
   nl_NL: {
     "placeholder.source": "Voer de tekst in die u wilt vertalen...",
@@ -419,6 +450,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Zoek talen...",
     "aria.searchLanguages": "Talen zoeken",
     "empty.noLanguages": "Geen talen gevonden",
+    "label.autoDetect": "Automatisch detecteren",
   },
   no_NO: {
     "placeholder.source": "Skriv inn teksten du vil oversette …",
@@ -432,6 +464,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Søk etter språk …",
     "aria.searchLanguages": "Søk etter språk",
     "empty.noLanguages": "Ingen språk funnet",
+    "label.autoDetect": "Oppdag automatisk",
   },
   pa_IN: {
     "placeholder.source": "ਅਨੁਵਾਦ ਕਰਨ ਲਈ ਇੱਥੇ ਟੈਕਸਟ ਦਰਜ ਕਰੋ...",
@@ -445,6 +478,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ਭਾਸ਼ਾਵਾਂ ਦੀ ਭਾਲ ਕਰੋ...",
     "aria.searchLanguages": "ਭਾਸ਼ਾਵਾਂ ਦੀ ਭਾਲ ਕਰੋ",
     "empty.noLanguages": "ਕੋਈ ਵੀ ਭਾਸ਼ਾ ਨਹੀਂ ਮਿਲੀ",
+    "label.autoDetect": "ਆਪਣੇ-ਆਪ ਪਛਾਣੋ",
   },
   pl_PL: {
     "placeholder.source": "Wprowadź tekst do przetłumaczenia...",
@@ -458,6 +492,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Wyszukaj języki...",
     "aria.searchLanguages": "Wyszukaj języki",
     "empty.noLanguages": "Nie znaleziono żadnych języków",
+    "label.autoDetect": "Wykryj automatycznie",
   },
   pt_BR: {
     "placeholder.source": "Digite o texto para traduzir...",
@@ -471,6 +506,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Pesquisar idiomas...",
     "aria.searchLanguages": "Pesquisar idiomas",
     "empty.noLanguages": "Nenhum idioma encontrado",
+    "label.autoDetect": "Detectar automaticamente",
   },
   pt_PT: {
     "placeholder.source": "Insira o texto a traduzir...",
@@ -484,6 +520,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Pesquisar idiomas...",
     "aria.searchLanguages": "Pesquisar idiomas",
     "empty.noLanguages": "Nenhum idioma encontrado",
+    "label.autoDetect": "Detetar automaticamente",
   },
   ro_RO: {
     "placeholder.source": "Introduceți textul pe care doriți să-l traduceți...",
@@ -497,6 +534,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Căutați limbi...",
     "aria.searchLanguages": "Căutați limbi",
     "empty.noLanguages": "Nu au fost găsite limbi",
+    "label.autoDetect": "Detectare automată",
   },
   ru_RU: {
     "placeholder.source": "Введите текст для перевода...",
@@ -510,6 +548,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Поиск языков...",
     "aria.searchLanguages": "Поиск языков",
     "empty.noLanguages": "Языки не найдены",
+    "label.autoDetect": "Автоопределение",
   },
   sk_SK: {
     "placeholder.source": "Zadajte text na preklad...",
@@ -523,6 +562,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Vyhľadávanie jazykov...",
     "aria.searchLanguages": "Vyhľadávanie jazykov",
     "empty.noLanguages": "Nenašli sa žiadne jazyky",
+    "label.autoDetect": "Automatické rozpoznanie",
   },
   sl_SI: {
     "placeholder.source": "Vnesite besedilo za prevod...",
@@ -536,6 +576,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Išči jezike...",
     "aria.searchLanguages": "Išči jezike",
     "empty.noLanguages": "Ni najdenih jezikov",
+    "label.autoDetect": "Samodejno zaznaj",
   },
   sr_RS: {
     "placeholder.source": "Унесите текст за превод...",
@@ -549,6 +590,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Претражите језике...",
     "aria.searchLanguages": "Претрага језика",
     "empty.noLanguages": "Није пронађен ниједан језик",
+    "label.autoDetect": "Аутоматско препознавање",
   },
   sv_SE: {
     "placeholder.source": "Skriv in texten som ska översättas ...",
@@ -562,6 +604,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Sök efter språk ...",
     "aria.searchLanguages": "Sök efter språk",
     "empty.noLanguages": "Inget språk hittades",
+    "label.autoDetect": "Identifiera automatiskt",
   },
   sw_KE: {
     "placeholder.source": "Andika maandishi ya kutafsiri...",
@@ -575,6 +618,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Tafuta lugha...",
     "aria.searchLanguages": "Tafuta lugha",
     "empty.noLanguages": "Hakuna lugha iliyopatikana",
+    "label.autoDetect": "Tambua kiotomatiki",
   },
   sw_TZ: {
     "placeholder.source": "Ingiza maandishi ya kutafsiri...",
@@ -588,6 +632,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Tafuta lugha...",
     "aria.searchLanguages": "Tafuta lugha",
     "empty.noLanguages": "Hakuna lugha zilizopatikana",
+    "label.autoDetect": "Tambua kiotomatiki",
   },
   ta_IN: {
     "placeholder.source": "மொழிபெயர்க்க வேண்டிய உரையை உள்ளிடவும்...",
@@ -601,6 +646,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "மொழிகளைத் தேடுங்கள்...",
     "aria.searchLanguages": "மொழிகளைத் தேடு",
     "empty.noLanguages": "எந்த மொழியும் கிடைக்கவில்லை",
+    "label.autoDetect": "தானாகக் கண்டறி",
   },
   te_IN: {
     "placeholder.source": "అనువదించాల్సిన వచనాన్ని నమోదు చేయండి...",
@@ -614,6 +660,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "భాషలను వెతకండి...",
     "aria.searchLanguages": "భాషలను వెతకండి",
     "empty.noLanguages": "ఏ భాషలు కనుగొనబడలేదు",
+    "label.autoDetect": "స్వయంచాలకంగా గుర్తించు",
   },
   th_TH: {
     "placeholder.source": "พิมพ์ข้อความที่ต้องการแปล...",
@@ -627,6 +674,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "ค้นหาภาษา...",
     "aria.searchLanguages": "ค้นหาภาษา",
     "empty.noLanguages": "ไม่พบภาษาที่ต้องการ",
+    "label.autoDetect": "ตรวจหาอัตโนมัติ",
   },
   tr_TR: {
     "placeholder.source": "Çevrilecek metni girin...",
@@ -640,6 +688,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Dilleri ara...",
     "aria.searchLanguages": "Dilleri ara",
     "empty.noLanguages": "Hiçbir dil bulunamadı",
+    "label.autoDetect": "Otomatik algıla",
   },
   uk_UA: {
     "placeholder.source": "Введіть текст для перекладу...",
@@ -653,6 +702,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Пошук мов...",
     "aria.searchLanguages": "Пошук мов",
     "empty.noLanguages": "Мови не знайдено",
+    "label.autoDetect": "Автовизначення",
   },
   ur_PK: {
     "placeholder.source": "ترجمہ کرنے کے لیے متن درج کریں...",
@@ -666,6 +716,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "زبانوں میں تلاش کریں...",
     "aria.searchLanguages": "زبانوں میں تلاش کریں",
     "empty.noLanguages": "کوئی زبان نہیں ملی",
+    "label.autoDetect": "خودکار شناخت",
   },
   vi_VN: {
     "placeholder.source": "Nhập văn bản cần dịch...",
@@ -679,6 +730,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Tìm kiếm ngôn ngữ...",
     "aria.searchLanguages": "Tìm kiếm ngôn ngữ",
     "empty.noLanguages": "Không tìm thấy ngôn ngữ nào",
+    "label.autoDetect": "Tự động phát hiện",
   },
   zh_CN: {
     "placeholder.source": "请输入要翻译的文本……",
@@ -692,6 +744,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "搜索语言……",
     "aria.searchLanguages": "搜索语言",
     "empty.noLanguages": "未找到任何语言",
+    "label.autoDetect": "自动检测",
   },
   zh_TW: {
     "placeholder.source": "請輸入要翻譯的文字……",
@@ -705,6 +758,7 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "搜尋語言……",
     "aria.searchLanguages": "搜尋語言",
     "empty.noLanguages": "未找到任何語言",
+    "label.autoDetect": "自動偵測",
   },
   zu_ZA: {
     "placeholder.source": "Faka umbhalo ofuna ukuhumusha...",
@@ -718,5 +772,6 @@ export const translatedLabels: Partial<Record<string, Labels>> = {
     "placeholder.searchLanguages": "Sesha izilimi...",
     "aria.searchLanguages": "Sesha izilimi",
     "empty.noLanguages": "Ayikho izilimi ezitholakele",
+    "label.autoDetect": "Thola ngokuzenzakalelayo",
   },
 };

@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from "react";
+import { AUTO_DETECT, DETECTED_LANGUAGE_HEADER } from "~/lib/languages";
 import { translateStream } from "~/serverFunctions/translateStream";
 
 interface OllamaStreamLine {
@@ -27,6 +28,15 @@ export function useStreamingTranslation() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stats, setStats] = useState<Stats | null>(null);
+  /**
+   * The language the server detected for the last auto request, with the text it was detected
+   * from; kept while typing, cleared when the text is emptied (clearDetection), a request fails,
+   * or a manual-source request starts.
+   */
+  const [detection, setDetection] = useState<{ language: string; text: string } | null>(null);
+  const clearDetection = useCallback(() => {
+    setDetection(null);
+  }, []);
 
   const controllerRef = useRef<AbortController | null>(null);
   const rafRef = useRef<number>(0);
@@ -52,6 +62,7 @@ export function useStreamingTranslation() {
       setError(null);
       setStats(null);
       setIsStreaming(true);
+      if (sourceLanguage !== AUTO_DETECT) setDetection(null);
 
       const controller = new AbortController();
       controllerRef.current = controller;
@@ -62,6 +73,9 @@ export function useStreamingTranslation() {
             data: { text, sourceLanguage, targetLanguage },
             signal: controller.signal,
           });
+          if (controller.signal.aborted) return; // superseded while the response was on its way
+          const language = response.headers.get(DETECTED_LANGUAGE_HEADER);
+          setDetection(language ? { language, text } : null);
 
           if (!response.body) {
             throw new Error("No response body");
@@ -145,6 +159,7 @@ export function useStreamingTranslation() {
             return; // Expected cancellation
           }
           setError(err instanceof Error ? err.message : "Translation failed");
+          setDetection(null);
           setIsStreaming(false);
         }
       })();
@@ -162,6 +177,8 @@ export function useStreamingTranslation() {
     setError,
     stats,
     setStats,
+    detection,
+    clearDetection,
     startTranslation,
     abort,
   };

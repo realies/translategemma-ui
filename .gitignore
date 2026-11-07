@@ -30,3 +30,6 @@ src/routeTree.gen.ts
 
 # Local dev instructions
 CLAUDE.md
+
+# Language-ID model (npm run fetch:glotlid)
+models/

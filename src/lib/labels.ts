@@ -11,6 +11,7 @@ export const DEFAULT_LABELS = {
   "placeholder.searchLanguages": "Search languages...",
   "aria.searchLanguages": "Search languages",
   "empty.noLanguages": "No languages found",
+  "label.autoDetect": "Auto-detect",
 } as const;
 
 export type LabelKey = keyof typeof DEFAULT_LABELS;

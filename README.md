@@ -12,6 +12,7 @@ Web interface for [TranslateGemma](https://blog.google/innovation-and-ai/technol
 
 - **55 languages** — searchable language selector with recent language pills
 - **Auto-translate** — starts translating as you type, no button needed
+- **Auto-detect** — pick "Auto-detect" as the source and the server detects the language, no LLM round trip
 - **Local inference** — no data leaves your machine, powered by [Ollama](https://ollama.ai)
 - **Remembers preferences** — last used language pair and recents restored on reload
 - **Swap languages** — flip source and target with one click
@@ -51,12 +52,35 @@ ollama pull translategemma:4b    # fastest (~2.5GB)
 
 ## Configuration
 
-| Variable        | Default                  | Description                          |
-| --------------- | ------------------------ | ------------------------------------ |
-| `OLLAMA_URL`    | `http://localhost:11434` | Ollama API endpoint                  |
-| `DEFAULT_MODEL` | `translategemma:27b`     | Model to use (`27b`, `12b`, or `4b`) |
-| `PORT`          | `3000`                   | Server port                          |
-| `HOST`          | `0.0.0.0`                | Server host                          |
+| Variable                       | Default                  | Description                                                                                          |
+| ------------------------------ | ------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `OLLAMA_URL`                   | `http://localhost:11434` | Ollama API endpoint                                                                                  |
+| `DEFAULT_MODEL`                | `translategemma:27b`     | Model to use (`27b`, `12b`, or `4b`)                                                                 |
+| `PORT`                         | `3000`                   | Server port                                                                                          |
+| `HOST`                         | `0.0.0.0`                | Server host                                                                                          |
+| `LANGUAGE_DETECTOR`            | `lite`                   | Auto-detect engine: `lite` (CLD3) or `accurate` (GlotLID v4)                                         |
+| `LANGUAGE_DETECTOR_PRELOAD`    | `false`                  | `true` loads the engine when the server starts, `false` on the first auto-detect request             |
+| `LANGUAGE_DETECTOR_KEEP_ALIVE` | `5m`                     | Idle time before the engine unloads (`30s`, `5m`, `1h`, or seconds); negative = never, `0` = at once |
+
+The server refuses to start when one of these `LANGUAGE_DETECTOR*` values is invalid.
+
+## Source-Language Auto-Detection
+
+The engine runs in the back end, only for requests whose source is "Auto-detect". The detected language is used for the prompt and shown on the pill ("Auto-detect: German"). Only the engine's top guess counts. When the text has no letters the request fails with "Couldn't detect the language. Choose the source language.", and when the top guess is not a supported language it fails with "Detected Afrikaans, which isn't supported. Choose the source language." There is no silent default and no second guess.
+
+| Engine               | Short text (≤ 40 chars) | Longer text | Memory when loaded | Image size |
+| -------------------- | ----------------------- | ----------- | ------------------ | ---------- |
+| `lite` (CLD3)        | ~80%                    | ~96%        | ~+30 MB            | < 1 MB     |
+| `accurate` (GlotLID) | ~89%                    | ~98%        | ~+500 MB           | +105 MB    |
+
+Accuracy was measured on our own benchmark (Tatoeba and Wikipedia text in the 51 supported languages), so treat it as relative, not absolute. Memory is the server's RSS increase while the engine is loaded. Both engines ship in the Docker image, so switching is a matter of setting `LANGUAGE_DETECTOR`. Outside Docker, run `npm run fetch:glotlid` once before using `accurate`, and start the server from the app directory: the engine's worker (`src/languageDetector/engine.worker.mjs`) and the model (`models/glotlid-v4.ftz`) are read relative to it.
+
+Known weaknesses, measured on the same benchmark:
+
+- A top guess outside the supported languages fails the request with the error above: about 11% of short text with `lite` and 6% with `accurate` (16% and 10% of text up to 15 characters). `lite` is also weak on short English UI phrases ("Hello" reads as Finnish). Choose `accurate`, or pick the source manually, for very short text.
+- Croatian, Serbian and Bosnian are hard to tell apart, and Bosnian is not supported: `lite` reads about 40% of Croatian and 28% of Serbian as Bosnian, and `accurate` reads most short Croatian as Serbian. Indonesian is sometimes read as Malay, which is not supported either. Users of these languages should pick the source manually.
+
+The engine's lifecycle works like Ollama's model loading. It loads on the first auto-detect request, or at startup with `LANGUAGE_DETECTOR_PRELOAD=true`; a preload failure stops the server from starting. It unloads after `LANGUAGE_DETECTOR_KEEP_ALIVE` of idle time, never while a detection is running. The engine runs in a worker thread, and unloading ends that thread, which frees the engine's memory. How much of it the process hands back to the OS depends on the allocator: on macOS about 200 MB of freed `accurate` pages stay resident for reuse (the total does not grow over repeated loads).
 
 ## Supported Languages
 
