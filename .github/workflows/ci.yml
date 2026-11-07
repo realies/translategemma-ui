@@ -63,3 +63,12 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      # The handler export shape broke dev before; prove the built server boots and renders.
+      - name: Smoke test production server
+        run: |
+          npm start &
+          for i in $(seq 1 15); do
+            curl -fs http://127.0.0.1:3000/health && curl -fs http://127.0.0.1:3000/ | grep -q "<html" && exit 0
+            sleep 1
+          done
+          exit 1
